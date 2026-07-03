@@ -662,6 +662,10 @@
           <span class="icon">🏆</span>
           <div class="label">Categorias</div>
         </div>
+        <div class="role-card" onclick="mostrarSubAba('senhas')">
+          <span class="icon">🔑</span>
+          <div class="label">Senhas</div>
+        </div>
       </div>
     </div>
 
@@ -742,6 +746,25 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== SUB-ABA: SENHAS ===== -->
+    <div id="subpainel-senhas" style="display:none;">
+      <button class="back-btn" style="margin-bottom:16px;" onclick="voltarMenuGerencial()">← Voltar ao menu</button>
+
+      <div class="panel">
+        <h2>Senhas dos administradores</h2>
+        <div class="hint">Altere a senha de acesso ao Painel Gerencial. Qualquer administrador logado pode alterar a senha de ambos.</div>
+        <div class="adm-list" id="senha-admin-lista"></div>
+      </div>
+
+      <div class="panel">
+        <h2>PINs dos GVs</h2>
+        <div class="hint">Redefina o PIN de acesso dos GVs. O padrão para todos é <strong>1234</strong>. Use o filtro para localizar rapidamente.</div>
+        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="senha-gv-filtro" placeholder="Filtrar por nome, código ou operação..." oninput="renderSenhasGVs()"></div>
+        <div class="adm-count" id="senha-gv-count"></div>
+        <div class="adm-list" id="senha-gv-lista"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ============================================================= -->
@@ -805,8 +828,9 @@ const CATEGORIAS_INICIAIS = [
 ];
 
 // Usuários com acesso ao Painel Gerencial (desenvolvedores/admin).
-// Para adicionar outro, copie a linha e edite nome e senha.
-const USUARIOS_GERENCIAIS = [
+// Estes são os valores iniciais (semente). As senhas ficam editáveis
+// pela aba "Senhas" do Painel Gerencial e são salvas no armazenamento.
+const USUARIOS_GERENCIAIS_INICIAIS = [
   { id: 'leonardo', nome: 'Leonardo', senha: '1234' },
   { id: 'rodrigo',  nome: 'Rodrigo',  senha: '1234' }
 ];
@@ -1079,6 +1103,27 @@ function salvarCategorias(){
 // Lista completa (para o painel gerencial) e só as ativas (para os GVs).
 let categorias = carregarCategorias();
 function categoriasAtivas(){ return categorias.filter(c => c.ativa); }
+
+/* ---------------- Persistência dos administradores ---------------- */
+
+const CHAVE_ADMINS = 'admins_gerenciais_v1';
+
+function carregarAdmins(){
+  const bruto = localStorage.getItem(CHAVE_ADMINS);
+  if(bruto){
+    try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed */ }
+  }
+  const semente = clonar(USUARIOS_GERENCIAIS_INICIAIS);
+  localStorage.setItem(CHAVE_ADMINS, JSON.stringify(semente));
+  return semente;
+}
+
+function salvarAdmins(){
+  localStorage.setItem(CHAVE_ADMINS, JSON.stringify(admins));
+  return Promise.resolve({ ok: true });
+}
+
+let admins = carregarAdmins();
 
 
 /* ---------------- Estado em memória da sessão atual ---------------- */
@@ -1399,7 +1444,7 @@ async function enviarValoresVendedor(){
 
 function abrirGerencial(){
   const sel = document.getElementById('ger-cial-user');
-  sel.innerHTML = USUARIOS_GERENCIAIS.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
+  sel.innerHTML = admins.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
   document.getElementById('ger-cial-pin').value = '';
   document.getElementById('ger-cial-erro').textContent = '';
   irPara('screen-gerencial-login');
@@ -1410,7 +1455,7 @@ function loginGerencial(){
   const pin = document.getElementById('ger-cial-pin').value.trim();
   const erroEl = document.getElementById('ger-cial-erro');
 
-  const usuario = USUARIOS_GERENCIAIS.find(u => u.id === userId);
+  const usuario = admins.find(u => u.id === userId);
   if(!usuario || pin !== usuario.senha){
     erroEl.textContent = 'Senha incorreta.';
     return;
@@ -1438,14 +1483,17 @@ function voltarMenuGerencial(){
   document.getElementById('subpainel-menu').style.display = 'block';
   document.getElementById('subpainel-equipe').style.display = 'none';
   document.getElementById('subpainel-categorias').style.display = 'none';
+  document.getElementById('subpainel-senhas').style.display = 'none';
 }
 
 function mostrarSubAba(qual){
   document.getElementById('subpainel-menu').style.display = 'none';
   document.getElementById('subpainel-equipe').style.display = (qual === 'equipe') ? 'block' : 'none';
   document.getElementById('subpainel-categorias').style.display = (qual === 'categorias') ? 'block' : 'none';
+  document.getElementById('subpainel-senhas').style.display = (qual === 'senhas') ? 'block' : 'none';
   if(qual === 'equipe') mostrarAbaGerencial('gc');
   if(qual === 'categorias') renderCategorias();
+  if(qual === 'senhas') renderSenhas();
 }
 
 /* ---------------- Gestão de categorias de desafios ---------------- */
@@ -1588,6 +1636,143 @@ async function salvarEdicaoCategoria(){
   fecharModalEdicao();
   renderCategorias();
   mostrarToast('Categoria atualizada.');
+}
+
+/* ---------------- Gestão de senhas (administradores e GVs) ---------------- */
+
+function renderSenhas(){
+  renderSenhasAdmins();
+  renderSenhasGVs();
+}
+
+function renderSenhasAdmins(){
+  const listaEl = document.getElementById('senha-admin-lista');
+  listaEl.innerHTML = admins.map(a => `
+    <div class="adm-row">
+      <div class="info">
+        <div class="adm-row-nome">${a.nome}</div>
+        <div class="adm-row-pai">Senha atual: ${'•'.repeat(a.senha.length)}</div>
+      </div>
+      <div class="actions">
+        <button class="mini-btn" onclick="abrirTrocaSenhaAdmin('${a.id}')">Alterar senha</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderSenhasGVs(){
+  const listaEl = document.getElementById('senha-gv-lista');
+  const countEl = document.getElementById('senha-gv-count');
+  const filtroEl = document.getElementById('senha-gv-filtro');
+  const termo = filtroEl ? filtroEl.value.trim().toLowerCase() : '';
+
+  const filtrados = termo
+    ? organizacao.gvs.filter(gv => textoBuscaItem('gv', gv).includes(termo))
+    : organizacao.gvs;
+
+  countEl.textContent = termo
+    ? `${filtrados.length} de ${organizacao.gvs.length} GV(s)`
+    : `${organizacao.gvs.length} GV(s)`;
+
+  if(organizacao.gvs.length === 0){
+    listaEl.innerHTML = '<div class="empty-state">Nenhum GV cadastrado.</div>';
+    return;
+  }
+  if(filtrados.length === 0){
+    listaEl.innerHTML = '<div class="empty-state">Nenhum resultado para esse filtro.</div>';
+    return;
+  }
+
+  listaEl.innerHTML = filtrados.map(gv => {
+    const op = organizacao.operacoes.find(o => o.id === gv.operacaoId);
+    const pin = gv.pin || '1234';
+    const ehPadrao = pin === '1234';
+    return `
+      <div class="adm-row">
+        <div class="info">
+          <div class="adm-row-nome">${gv.nome}</div>
+          <div class="adm-row-pai">${op ? op.nome : 'Sem operação'} · PIN: ${'•'.repeat(pin.length)}${ehPadrao ? ' (padrão)' : ''}</div>
+        </div>
+        <div class="actions">
+          <button class="mini-btn" onclick="abrirTrocaPinGV('${gv.id}')">Alterar PIN</button>
+          ${ehPadrao ? '' : `<button class="mini-btn danger" onclick="resetarPinGV('${gv.id}')">Resetar</button>`}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// --- Troca de senha do administrador (via modal) ---
+let adminTrocandoSenha = null;
+
+function abrirTrocaSenhaAdmin(id){
+  const admin = admins.find(a => a.id === id);
+  if(!admin) return;
+  adminTrocandoSenha = id;
+  document.getElementById('modal-titulo').textContent = `Nova senha — ${admin.nome}`;
+  document.getElementById('modal-campos').innerHTML = `
+    <label>Nova senha</label>
+    <input type="password" id="modal-campo-novasenha" inputmode="numeric" placeholder="Digite a nova senha">
+    <label>Confirmar nova senha</label>
+    <input type="password" id="modal-campo-confsenha" inputmode="numeric" placeholder="Repita a nova senha">
+  `;
+  document.getElementById('modal-edicao').dataset.tipo = 'senha-admin';
+  document.getElementById('modal-edicao').classList.add('active');
+}
+
+async function salvarTrocaSenhaAdmin(){
+  const admin = admins.find(a => a.id === adminTrocandoSenha);
+  if(!admin) return;
+  const nova = document.getElementById('modal-campo-novasenha').value.trim();
+  const conf = document.getElementById('modal-campo-confsenha').value.trim();
+  if(!nova){ mostrarToast('Digite a nova senha.'); return; }
+  if(nova !== conf){ mostrarToast('As senhas não coincidem.'); return; }
+  admin.senha = nova;
+  await salvarAdmins();
+  fecharModalEdicao();
+  renderSenhasAdmins();
+  mostrarToast('Senha do administrador alterada.');
+}
+
+// --- Troca de PIN do GV (via modal) ---
+let gvTrocandoPin = null;
+
+function abrirTrocaPinGV(id){
+  const gv = organizacao.gvs.find(g => g.id === id);
+  if(!gv) return;
+  gvTrocandoPin = id;
+  document.getElementById('modal-titulo').textContent = `Novo PIN — ${gv.nome}`;
+  document.getElementById('modal-campos').innerHTML = `
+    <label>Novo PIN</label>
+    <input type="password" id="modal-campo-novopin" inputmode="numeric" maxlength="6" placeholder="Digite o novo PIN">
+    <label>Confirmar novo PIN</label>
+    <input type="password" id="modal-campo-confpin" inputmode="numeric" maxlength="6" placeholder="Repita o novo PIN">
+  `;
+  document.getElementById('modal-edicao').dataset.tipo = 'pin-gv';
+  document.getElementById('modal-edicao').classList.add('active');
+}
+
+async function salvarTrocaPinGV(){
+  const gv = organizacao.gvs.find(g => g.id === gvTrocandoPin);
+  if(!gv) return;
+  const novo = document.getElementById('modal-campo-novopin').value.trim();
+  const conf = document.getElementById('modal-campo-confpin').value.trim();
+  if(!novo){ mostrarToast('Digite o novo PIN.'); return; }
+  if(novo !== conf){ mostrarToast('Os PINs não coincidem.'); return; }
+  gv.pin = novo;
+  await salvarOrganizacaoNoBackend(organizacao);
+  fecharModalEdicao();
+  renderSenhasGVs();
+  mostrarToast('PIN do GV alterado.');
+}
+
+async function resetarPinGV(id){
+  const gv = organizacao.gvs.find(g => g.id === id);
+  if(!gv) return;
+  if(!confirm(`Resetar o PIN de ${gv.nome} para o padrão 1234?`)) return;
+  gv.pin = '1234';
+  await salvarOrganizacaoNoBackend(organizacao);
+  renderSenhasGVs();
+  mostrarToast('PIN resetado para 1234.');
 }
 
 /* ---------------- Renderização genérica de lista + formulário ---------------- */
@@ -1768,14 +1953,16 @@ function fecharModalEdicao(){
   modal.dataset.tipo = '';
   edicaoAtual = { nivel: null, id: null };
   categoriaEditando = null;
+  adminTrocandoSenha = null;
+  gvTrocandoPin = null;
 }
 
 async function salvarEdicaoModal(){
-  // O modal é compartilhado: pode estar editando uma categoria ou um item da organização.
-  if(document.getElementById('modal-edicao').dataset.tipo === 'categoria'){
-    await salvarEdicaoCategoria();
-    return;
-  }
+  // O modal é compartilhado entre vários tipos de edição.
+  const tipo = document.getElementById('modal-edicao').dataset.tipo;
+  if(tipo === 'categoria'){ await salvarEdicaoCategoria(); return; }
+  if(tipo === 'senha-admin'){ await salvarTrocaSenhaAdmin(); return; }
+  if(tipo === 'pin-gv'){ await salvarTrocaPinGV(); return; }
 
   const { nivel, id } = edicaoAtual;
   if(!nivel || !id) return;
