@@ -545,13 +545,17 @@
     </div>
 
     <div class="panel">
-      <h2>Importar planilha</h2>
+      <h2>Importar / Exportar Excel</h2>
       <div class="hint">
-        A planilha deve conter as colunas: <strong>Operacao Nome</strong>, <strong>Operacao</strong> (código),
+        Colunas reconhecidas: <strong>Operacao Nome</strong>, <strong>Operacao</strong> (código),
         <strong>GERENTE COMERCIAL</strong>, <strong>GV</strong> (código), <strong>GV - NOME</strong>,
-        <strong>Setor</strong> (código do RN). Colunas de código são opcionais quando não existirem.<br><br>
-        <strong>Atenção:</strong> importar substitui todo o cadastro atual.
+        <strong>Setor</strong> (código do RN), <strong>RN - NOME</strong> (opcional).<br><br>
+        Ao importar, cada linha é identificada pelo código do <strong>Setor</strong>: se o Setor já existe,
+        a linha é <strong>atualizada</strong>; se for um Setor novo, a linha é <strong>adicionada</strong>.
+        Nada que não estiver na planilha é apagado.
       </div>
+      <button class="primary-btn" style="margin-top:0;" onclick="exportarExcel()">⬇ Exportar Excel (dados atuais)</button>
+      <label style="margin-top:16px;">Importar arquivo (.xlsx / .csv)</label>
       <input type="file" id="adm-import-arquivo" accept=".xlsx,.xls,.csv" onchange="processarArquivoImportacao(event)">
       <button class="back-btn" style="width:100%; margin-top:12px;" onclick="restaurarBaseInicial()">↺ Restaurar base original da planilha</button>
     </div>
@@ -1417,13 +1421,24 @@ async function importarLinhasParaOrganizacao(linhas){
     mostrarToast('A planilha está vazia.');
     return;
   }
-  if(!confirm(`Isso vai SUBSTITUIR todo o cadastro atual pelos dados da planilha (${linhas.length} linha(s)). Continuar?`)) return;
+  if(!confirm(`Importar ${linhas.length} linha(s)? Linhas com Setor já cadastrado serão atualizadas; Setores novos serão adicionados. Nada será apagado.`)) return;
 
-  const nova = obterOrganizacaoVazia();
-  const mapaGC = new Map();
-  const mapaOP = new Map();
-  const mapaGV = new Map();
-  const mapaRN = new Map();
+  // Índices auxiliares para localizar registros existentes rapidamente.
+  const acharGCporNome = (nome) =>
+    organizacao.gerentesComerciais.find(g => g.nome.trim().toUpperCase() === nome.trim().toUpperCase());
+  const acharOP = (codigo, nome) =>
+    organizacao.operacoes.find(o =>
+      (codigo && String(o.codigo) === String(codigo)) ||
+      (!codigo && o.nome.trim().toUpperCase() === nome.trim().toUpperCase()));
+  const acharGV = (codigo, opId, nome) =>
+    organizacao.gvs.find(g =>
+      g.operacaoId === opId &&
+      ((codigo && String(g.codigo) === String(codigo)) ||
+       (!codigo && g.nome.trim().toUpperCase() === nome.trim().toUpperCase())));
+  const acharRNporSetor = (codigo) =>
+    organizacao.rns.find(r => codigo && String(r.codigo) === String(codigo));
+
+  let atualizados = 0, adicionados = 0, ignorados = 0;
 
   linhas.forEach(linha => {
     const chaves = {};
@@ -1437,48 +1452,115 @@ async function importarLinhasParaOrganizacao(linhas){
     const rnCodigo = String(chaves['SETOR'] || chaves['RN'] || '').trim();
     const rnNome = String(chaves['RN - NOME'] || chaves['RN NOME'] || '').trim();
 
-    if(!opNome || !gcNome) return;
+    if(!opNome || !gcNome){ ignorados++; return; }
 
-    let gc = mapaGC.get(gcNome);
+    // Gerente Comercial (cria se não existir)
+    let gc = acharGCporNome(gcNome);
     if(!gc){
       gc = { id: gerarId('gc'), nome: gcNome };
-      mapaGC.set(gcNome, gc);
-      nova.gerentesComerciais.push(gc);
+      organizacao.gerentesComerciais.push(gc);
     }
 
-    const chaveOp = opCodigo ? `COD_${opCodigo}` : opNome;
-    let op = mapaOP.get(chaveOp);
+    // Operação (cria se não existir; atualiza vínculo/nome se existir)
+    let op = acharOP(opCodigo, opNome);
     if(!op){
       op = { id: gerarId('op'), nome: opNome, codigo: opCodigo, gerenteComercialId: gc.id };
-      mapaOP.set(chaveOp, op);
-      nova.operacoes.push(op);
+      organizacao.operacoes.push(op);
+    }else{
+      op.nome = opNome;
+      if(opCodigo) op.codigo = opCodigo;
+      op.gerenteComercialId = gc.id;
     }
 
+    // GV (cria se não existir; atualiza nome se existir)
+    let gv = null;
     if(gvCodigo || gvNome){
-      const chaveGv = `${op.id}_${gvCodigo || gvNome}`;
-      let gv = mapaGV.get(chaveGv);
+      gv = acharGV(gvCodigo, op.id, gvNome);
       if(!gv){
         gv = { id: gerarId('gv'), nome: gvNome || `GV ${gvCodigo}`, codigo: gvCodigo, operacaoId: op.id, pin: '1234' };
-        mapaGV.set(chaveGv, gv);
-        nova.gvs.push(gv);
+        organizacao.gvs.push(gv);
+      }else{
+        if(gvNome) gv.nome = gvNome;
+        if(gvCodigo) gv.codigo = gvCodigo;
+        gv.operacaoId = op.id;
       }
+    }
 
-      if(rnCodigo || rnNome){
-        const chaveRn = `${gv.id}_${rnCodigo || rnNome}`;
-        if(!mapaRN.has(chaveRn)){
-          const rn = { id: gerarId('rn'), nome: rnNome, codigo: rnCodigo, gvId: gv.id };
-          mapaRN.set(chaveRn, rn);
-          nova.rns.push(rn);
-        }
+    // RN — chave = código do Setor. Atualiza se já existe, senão adiciona.
+    if(gv && (rnCodigo || rnNome)){
+      const rnExistente = acharRNporSetor(rnCodigo);
+      if(rnExistente){
+        rnExistente.gvId = gv.id;
+        if(rnNome) rnExistente.nome = rnNome;
+        if(rnCodigo) rnExistente.codigo = rnCodigo;
+        atualizados++;
+      }else{
+        organizacao.rns.push({ id: gerarId('rn'), nome: rnNome, codigo: rnCodigo, gvId: gv.id });
+        adicionados++;
       }
     }
   });
 
-  organizacao = nova;
   await salvarOrganizacaoNoBackend(organizacao);
-  renderNivel(document.querySelector('.tab-btn.active') ? Object.keys(NIVEIS).find(k => document.getElementById(`adm-tab-${k}`).classList.contains('active')) : 'gc');
+  const nivelAtivo = Object.keys(NIVEIS).find(k => document.getElementById(`adm-tab-${k}`).classList.contains('active')) || 'gc';
+  renderNivel(nivelAtivo);
   atualizarSelectsDeLogin();
-  mostrarToast(`Importado: ${nova.gerentesComerciais.length} gerente(s) comercial(is), ${nova.operacoes.length} operação(ões), ${nova.gvs.length} GV(s), ${nova.rns.length} RN(s).`);
+  mostrarToast(`Importação concluída: ${adicionados} novo(s), ${atualizados} atualizado(s)${ignorados ? `, ${ignorados} ignorado(s)` : ''}.`);
+}
+
+/* ---------------- Exportar Excel com os dados atuais ---------------- */
+
+function exportarExcel(){
+  // Monta uma linha por RN, "achatando" a hierarquia (igual ao formato da planilha original).
+  const linhas = [];
+
+  organizacao.rns.forEach(rn => {
+    const gv = organizacao.gvs.find(g => g.id === rn.gvId);
+    const op = gv ? organizacao.operacoes.find(o => o.id === gv.operacaoId) : null;
+    const gc = op ? organizacao.gerentesComerciais.find(g => g.id === op.gerenteComercialId) : null;
+    linhas.push({
+      'Operacao Nome': op ? op.nome : '',
+      'Operacao': op ? op.codigo : '',
+      'GERENTE COMERCIAL': gc ? gc.nome : '',
+      'GV': gv ? gv.codigo : '',
+      'GV - NOME': gv ? gv.nome : '',
+      'Setor': rn.codigo || '',
+      'RN - NOME': rn.nome || ''
+    });
+  });
+
+  // Inclui também GVs sem nenhum RN, para não se perderem na exportação.
+  organizacao.gvs.forEach(gv => {
+    const temRN = organizacao.rns.some(r => r.gvId === gv.id);
+    if(!temRN){
+      const op = organizacao.operacoes.find(o => o.id === gv.operacaoId);
+      const gc = op ? organizacao.gerentesComerciais.find(g => g.id === op.gerenteComercialId) : null;
+      linhas.push({
+        'Operacao Nome': op ? op.nome : '',
+        'Operacao': op ? op.codigo : '',
+        'GERENTE COMERCIAL': gc ? gc.nome : '',
+        'GV': gv.codigo || '',
+        'GV - NOME': gv.nome || '',
+        'Setor': '',
+        'RN - NOME': ''
+      });
+    }
+  });
+
+  if(linhas.length === 0){
+    mostrarToast('Não há dados para exportar.');
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(linhas, {
+    header: ['Operacao Nome','Operacao','GERENTE COMERCIAL','GV','GV - NOME','Setor','RN - NOME']
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Base Comercial');
+
+  const hoje = hojeISO();
+  XLSX.writeFile(wb, `desafios-diario-base-${hoje}.xlsx`);
+  mostrarToast('Excel exportado.');
 }
 
 
