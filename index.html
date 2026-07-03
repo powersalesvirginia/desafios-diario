@@ -392,6 +392,68 @@
     font-family:var(--font-body);
     font-size:13px;
   }
+
+  /* ---------- Filtro das abas gerenciais ---------- */
+  .adm-filtro{
+    position:relative;
+    margin-bottom:12px;
+  }
+  .adm-filtro input{
+    width:100%;
+    padding-left:34px;
+  }
+  .adm-filtro .lupa{
+    position:absolute;
+    left:11px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:14px;
+    opacity:0.5;
+    pointer-events:none;
+  }
+  .adm-count{
+    font-size:12px;
+    color:var(--chalk-dim);
+    margin-bottom:10px;
+  }
+
+  /* ---------- Modal de edição ---------- */
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(20,26,23,0.55);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:1000;
+  }
+  .modal-overlay.active{ display:flex; }
+  .modal-box{
+    background:var(--board-light);
+    border-radius:var(--radius);
+    padding:22px;
+    width:100%;
+    max-width:420px;
+    box-shadow:0 12px 40px rgba(20,26,23,0.3);
+    max-height:88vh;
+    overflow-y:auto;
+  }
+  .modal-box h2{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:16px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    margin:0 0 16px 0;
+    color:var(--amber);
+  }
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    margin-top:20px;
+  }
+  .modal-actions button{ flex:1; margin-top:0; }
 </style>
 </head>
 <body>
@@ -570,20 +632,42 @@
       </div>
 
       <div id="adm-painel-gc" class="adm-painel">
+        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-gc" placeholder="Filtrar por nome..." oninput="renderNivel('gc')"></div>
+        <div class="adm-count" id="adm-count-gc"></div>
         <div class="adm-list" id="adm-lista-gc"></div>
         <div id="adm-form-gc"></div>
       </div>
       <div id="adm-painel-operacao" class="adm-painel" style="display:none;">
+        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-operacao" placeholder="Filtrar por nome, código ou gerente..." oninput="renderNivel('operacao')"></div>
+        <div class="adm-count" id="adm-count-operacao"></div>
         <div class="adm-list" id="adm-lista-operacao"></div>
         <div id="adm-form-operacao"></div>
       </div>
       <div id="adm-painel-gv" class="adm-painel" style="display:none;">
+        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-gv" placeholder="Filtrar por nome, código ou operação..." oninput="renderNivel('gv')"></div>
+        <div class="adm-count" id="adm-count-gv"></div>
         <div class="adm-list" id="adm-lista-gv"></div>
         <div id="adm-form-gv"></div>
       </div>
       <div id="adm-painel-rn" class="adm-painel" style="display:none;">
+        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-rn" placeholder="Filtrar por nome, setor ou GV..." oninput="renderNivel('rn')"></div>
+        <div class="adm-count" id="adm-count-rn"></div>
         <div class="adm-list" id="adm-lista-rn"></div>
         <div id="adm-form-rn"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL DE EDIÇÃO (gerencial)                                    -->
+  <!-- ============================================================= -->
+  <div class="modal-overlay" id="modal-edicao">
+    <div class="modal-box">
+      <h2 id="modal-titulo">Editar</h2>
+      <div id="modal-campos"></div>
+      <div class="modal-actions">
+        <button class="back-btn" onclick="fecharModalEdicao()">Cancelar</button>
+        <button class="primary-btn" onclick="salvarEdicaoModal()">Salvar</button>
       </div>
     </div>
   </div>
@@ -1245,13 +1329,37 @@ function nomeDoPai(nivel, item){
   return pai ? `${cfg.pai.label}: ${pai.nome}` : '';
 }
 
-function renderNivel(nivel){
+// Texto usado para o filtro: junta nome, código e o nome do "pai" (operação/GV etc.)
+function textoBuscaItem(nivel, item){
+  const partes = [item.nome || '', item.codigo || ''];
   const cfg = NIVEIS[nivel];
-  const listaEl = document.getElementById(`adm-lista-${nivel}`);
-  const itens = obterArray(nivel);
+  if(cfg.pai){
+    const pai = obterArray(cfg.pai.nivel).find(p => p.id === item[cfg.pai.campo]);
+    if(pai){ partes.push(pai.nome || ''); partes.push(pai.codigo || ''); }
+  }
+  return partes.join(' ').toLowerCase();
+}
 
-  if(itens.length === 0){
+function renderNivel(nivel){
+  const listaEl = document.getElementById(`adm-lista-${nivel}`);
+  const countEl = document.getElementById(`adm-count-${nivel}`);
+  const filtroEl = document.getElementById(`adm-filtro-${nivel}`);
+  const termo = filtroEl ? filtroEl.value.trim().toLowerCase() : '';
+
+  const todos = obterArray(nivel);
+  const itens = termo
+    ? todos.filter(item => textoBuscaItem(nivel, item).includes(termo))
+    : todos;
+
+  if(countEl){
+    if(termo) countEl.textContent = `${itens.length} de ${todos.length} registro(s)`;
+    else countEl.textContent = `${todos.length} registro(s)`;
+  }
+
+  if(todos.length === 0){
     listaEl.innerHTML = '<div class="empty-state">Nenhum registro cadastrado ainda.</div>';
+  }else if(itens.length === 0){
+    listaEl.innerHTML = '<div class="empty-state">Nenhum resultado para esse filtro.</div>';
   }else{
     listaEl.innerHTML = itens.map(item => {
       const codigoTxt = item.codigo ? ` · Cód. ${item.codigo}` : '';
@@ -1296,15 +1404,18 @@ function renderFormNivel(nivel){
   }
 
   formEl.innerHTML = `
-    ${camposHtml}
-    ${paiHtml}
-    <input type="hidden" id="adm-editando-${nivel}" value="">
-    <button class="primary-btn" onclick="salvarItemNivel('${nivel}')">Cadastrar</button>
-    <button class="back-btn" id="adm-cancelar-${nivel}" style="display:none; margin-top:8px; width:100%;" onclick="cancelarEdicaoNivel('${nivel}')">Cancelar edição</button>
+    <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--divider);">
+      <div class="adm-count" style="margin-bottom:12px;">Cadastrar novo ${cfg.label}</div>
+      ${camposHtml}
+      ${paiHtml}
+      <button class="primary-btn" onclick="cadastrarItemNivel('${nivel}')">Cadastrar</button>
+    </div>
   `;
 }
 
-async function salvarItemNivel(nivel){
+/* ---------------- Cadastro de NOVO item (formulário no rodapé da aba) ---------------- */
+
+async function cadastrarItemNivel(nivel){
   const cfg = NIVEIS[nivel];
   const valores = {};
 
@@ -1326,52 +1437,99 @@ async function salvarItemNivel(nivel){
     valores[cfg.pai.campo] = paiId;
   }
 
-  const editandoId = document.getElementById(`adm-editando-${nivel}`).value;
-  const arr = obterArray(nivel);
+  aplicarChaveRN(nivel, valores);
 
-  // Para RN, recalcula a chave oculta (codigoOperacao_codigoSetor) a partir
-  // da operação do GV selecionado + o código do setor informado.
-  if(nivel === 'rn'){
-    const gv = organizacao.gvs.find(g => g.id === valores.gvId);
-    const op = gv ? organizacao.operacoes.find(o => o.id === gv.operacaoId) : null;
-    const opCod = op ? (op.codigo || op.id) : 'x';
-    valores.chave = `${opCod}_${valores.codigo || ''}`;
-  }
-
-  if(editandoId){
-    Object.assign(arr.find(i => i.id === editandoId), valores);
-  }else{
-    valores.id = gerarId(nivel);
-    if(nivel === 'gv' && !valores.pin) valores.pin = '1234';
-    arr.push(valores);
-  }
+  valores.id = gerarId(nivel);
+  if(nivel === 'gv' && !valores.pin) valores.pin = '1234';
+  obterArray(nivel).push(valores);
 
   await salvarOrganizacaoNoBackend(organizacao);
   renderNivel(nivel);
   atualizarSelectsDeLogin();
-  mostrarToast('Salvo com sucesso.');
+  mostrarToast('Cadastrado com sucesso.');
 }
+
+// Recalcula a chave oculta do RN (codigoOperacao_codigoSetor) a partir do GV pai.
+function aplicarChaveRN(nivel, valores){
+  if(nivel !== 'rn') return;
+  const gv = organizacao.gvs.find(g => g.id === valores.gvId);
+  const op = gv ? organizacao.operacoes.find(o => o.id === gv.operacaoId) : null;
+  const opCod = op ? (op.codigo || op.id) : 'x';
+  valores.chave = `${opCod}_${valores.codigo || ''}`;
+}
+
+/* ---------------- Edição via modal ---------------- */
+
+let edicaoAtual = { nivel: null, id: null };
 
 function editarItemNivel(nivel, id){
   const cfg = NIVEIS[nivel];
   const item = obterArray(nivel).find(i => i.id === id);
   if(!item) return;
 
-  cfg.campos.forEach(c => {
-    document.getElementById(`adm-campo-${nivel}-${c.key}`).value = item[c.key] || '';
-  });
+  edicaoAtual = { nivel, id };
+  document.getElementById('modal-titulo').textContent = `Editar ${cfg.label}`;
+
+  const camposHtml = cfg.campos.map(c => `
+    <label>${c.label}</label>
+    <input type="text" id="modal-campo-${c.key}" value="${(item[c.key] || '').toString().replace(/"/g,'&quot;')}" placeholder="${c.label}">
+  `).join('');
+
+  let paiHtml = '';
   if(cfg.pai){
-    document.getElementById(`adm-campo-${nivel}-${cfg.pai.campo}`).value = item[cfg.pai.campo] || '';
+    const opcoes = obterArray(cfg.pai.nivel);
+    paiHtml = `
+      <label>${cfg.pai.label}</label>
+      <select id="modal-campo-${cfg.pai.campo}">
+        <option value="">Selecione...</option>
+        ${opcoes.map(o => `<option value="${o.id}" ${o.id === item[cfg.pai.campo] ? 'selected' : ''}>${o.nome}</option>`).join('')}
+      </select>
+    `;
   }
 
-  document.getElementById(`adm-editando-${nivel}`).value = id;
-  document.getElementById(`adm-cancelar-${nivel}`).style.display = 'block';
-  document.querySelector(`#adm-form-${nivel} .primary-btn`).textContent = 'Salvar edição';
-  document.getElementById(`adm-form-${nivel}`).scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('modal-campos').innerHTML = camposHtml + paiHtml;
+  document.getElementById('modal-edicao').classList.add('active');
 }
 
-function cancelarEdicaoNivel(nivel){
-  renderFormNivel(nivel);
+function fecharModalEdicao(){
+  document.getElementById('modal-edicao').classList.remove('active');
+  edicaoAtual = { nivel: null, id: null };
+}
+
+async function salvarEdicaoModal(){
+  const { nivel, id } = edicaoAtual;
+  if(!nivel || !id) return;
+  const cfg = NIVEIS[nivel];
+  const item = obterArray(nivel).find(i => i.id === id);
+  if(!item) return;
+
+  const valores = {};
+  for(const c of cfg.campos){
+    const valor = document.getElementById(`modal-campo-${c.key}`).value.trim();
+    if(c.obrigatorio && !valor){
+      mostrarToast(`Preencha: ${c.label}`);
+      return;
+    }
+    valores[c.key] = valor;
+  }
+
+  if(cfg.pai){
+    const paiId = document.getElementById(`modal-campo-${cfg.pai.campo}`).value;
+    if(!paiId){
+      mostrarToast(`Selecione: ${cfg.pai.label}`);
+      return;
+    }
+    valores[cfg.pai.campo] = paiId;
+  }
+
+  Object.assign(item, valores);
+  aplicarChaveRN(nivel, item);
+
+  await salvarOrganizacaoNoBackend(organizacao);
+  fecharModalEdicao();
+  renderNivel(nivel);
+  atualizarSelectsDeLogin();
+  mostrarToast('Alteração salva.');
 }
 
 async function excluirItemNivel(nivel, id){
