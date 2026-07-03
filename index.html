@@ -507,6 +507,9 @@
 
     <div class="panel">
       <h2>Acesso restrito</h2>
+      <label for="ger-cial-user">Usuário</label>
+      <select id="ger-cial-user"></select>
+
       <label for="ger-cial-pin">Senha</label>
       <input type="password" id="ger-cial-pin" inputmode="numeric" placeholder="••••">
       <div class="error-msg" id="ger-cial-erro"></div>
@@ -532,6 +535,7 @@
         <strong>Atenção:</strong> importar substitui todo o cadastro atual.
       </div>
       <input type="file" id="adm-import-arquivo" accept=".xlsx,.xls,.csv" onchange="processarArquivoImportacao(event)">
+      <button class="back-btn" style="width:100%; margin-top:12px;" onclick="restaurarBaseInicial()">↺ Restaurar base original da planilha</button>
     </div>
 
     <div class="panel">
@@ -607,11 +611,146 @@ const CATEGORIAS = [
   // { id: 'NOVA_CATEGORIA', label: 'Nome que aparece na tela' },
 ];
 
-// Senha para acessar o Painel Gerencial (botão "⚙ Gerencial" na Home)
-const SENHA_GERENCIAL = '2026';
+// Usuários com acesso ao Painel Gerencial (desenvolvedores/admin).
+// Para adicionar outro, copie a linha e edite nome e senha.
+const USUARIOS_GERENCIAIS = [
+  { id: 'leonardo', nome: 'Leonardo', senha: '1234' },
+  { id: 'rodrigo',  nome: 'Rodrigo',  senha: '1234' }
+];
 
 // URL do Web App do Google Apps Script (backend conectado ao Google Sheets)
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyDHFSXr1OGj-COPp2B9mzNtKzCVHhkkQACInGz8_z3BP8R8qwuxX2zqL5jBac1Tq6/exec';
+
+/* =====================================================================
+   BASE INICIAL DA EQUIPE COMERCIAL (pré-carregada)
+   — extraída da planilha enviada. Serve como ponto de partida quando
+     ainda não há nada salvo. Editável pela tela Gerencial.
+===================================================================== */
+const BASE_INICIAL = {
+  gerentesComerciais: [
+    { id: "gc1", nome: "ROBSON CAMPOS" },
+    { id: "gc2", nome: "LEANDRO" }
+  ],
+  operacoes: [
+    { id: "op1", nome: "Virginia Maringa", codigo: "1", gerenteComercialId: "gc1" },
+    { id: "op2", nome: "Virginia Guarapuava", codigo: "2", gerenteComercialId: "gc2" },
+    { id: "op3", nome: "Virginia Ponta Grossa", codigo: "3", gerenteComercialId: "gc2" },
+    { id: "op4", nome: "Virginia Norte Pioneiro", codigo: "4", gerenteComercialId: "gc1" }
+  ],
+  gvs: [
+    { id: "gvop1_1", nome: "GV - ANDERSON", codigo: "1", operacaoId: "op1", pin: "1234" },
+    { id: "gvop1_2", nome: "GV - RONALDO", codigo: "2", operacaoId: "op1", pin: "1234" },
+    { id: "gvop1_3", nome: "GV - REGINALDO", codigo: "3", operacaoId: "op1", pin: "1234" },
+    { id: "gvop1_4", nome: "GV - FERNANDO", codigo: "4", operacaoId: "op1", pin: "1234" },
+    { id: "gvop2_1", nome: "GV - DANILO", codigo: "1", operacaoId: "op2", pin: "1234" },
+    { id: "gvop2_2", nome: "GV - CLEVERSON", codigo: "2", operacaoId: "op2", pin: "1234" },
+    { id: "gvop3_1", nome: "GV - PRISCILA", codigo: "1", operacaoId: "op3", pin: "1234" },
+    { id: "gvop3_2", nome: "GV - ALEXANDRE", codigo: "2", operacaoId: "op3", pin: "1234" },
+    { id: "gvop3_3", nome: "GV - MAURO", codigo: "3", operacaoId: "op3", pin: "1234" },
+    { id: "gvop4_1", nome: "GV - LUIZ", codigo: "1", operacaoId: "op4", pin: "1234" }
+  ],
+  rns: [
+    { id: "rnop1_101", nome: "", codigo: "101", gvId: "gvop1_1" },
+    { id: "rnop1_102", nome: "", codigo: "102", gvId: "gvop1_1" },
+    { id: "rnop1_103", nome: "", codigo: "103", gvId: "gvop1_1" },
+    { id: "rnop1_104", nome: "", codigo: "104", gvId: "gvop1_1" },
+    { id: "rnop1_105", nome: "", codigo: "105", gvId: "gvop1_1" },
+    { id: "rnop1_106", nome: "", codigo: "106", gvId: "gvop1_1" },
+    { id: "rnop1_107", nome: "", codigo: "107", gvId: "gvop1_1" },
+    { id: "rnop1_108", nome: "", codigo: "108", gvId: "gvop1_1" },
+    { id: "rnop1_109", nome: "", codigo: "109", gvId: "gvop1_1" },
+    { id: "rnop1_121", nome: "", codigo: "121", gvId: "gvop1_1" },
+    { id: "rnop1_122", nome: "", codigo: "122", gvId: "gvop1_1" },
+    { id: "rnop1_123", nome: "", codigo: "123", gvId: "gvop1_1" },
+    { id: "rnop1_201", nome: "", codigo: "201", gvId: "gvop1_2" },
+    { id: "rnop1_202", nome: "", codigo: "202", gvId: "gvop1_2" },
+    { id: "rnop1_203", nome: "", codigo: "203", gvId: "gvop1_2" },
+    { id: "rnop1_204", nome: "", codigo: "204", gvId: "gvop1_2" },
+    { id: "rnop1_205", nome: "", codigo: "205", gvId: "gvop1_2" },
+    { id: "rnop1_206", nome: "", codigo: "206", gvId: "gvop1_2" },
+    { id: "rnop1_207", nome: "", codigo: "207", gvId: "gvop1_2" },
+    { id: "rnop1_208", nome: "", codigo: "208", gvId: "gvop1_2" },
+    { id: "rnop1_209", nome: "", codigo: "209", gvId: "gvop1_2" },
+    { id: "rnop1_210", nome: "", codigo: "210", gvId: "gvop1_2" },
+    { id: "rnop1_211", nome: "", codigo: "211", gvId: "gvop1_2" },
+    { id: "rnop1_301", nome: "", codigo: "301", gvId: "gvop1_3" },
+    { id: "rnop1_302", nome: "", codigo: "302", gvId: "gvop1_3" },
+    { id: "rnop1_303", nome: "", codigo: "303", gvId: "gvop1_3" },
+    { id: "rnop1_304", nome: "", codigo: "304", gvId: "gvop1_3" },
+    { id: "rnop1_305", nome: "", codigo: "305", gvId: "gvop1_3" },
+    { id: "rnop1_306", nome: "", codigo: "306", gvId: "gvop1_3" },
+    { id: "rnop1_307", nome: "", codigo: "307", gvId: "gvop1_3" },
+    { id: "rnop1_308", nome: "", codigo: "308", gvId: "gvop1_3" },
+    { id: "rnop1_309", nome: "", codigo: "309", gvId: "gvop1_3" },
+    { id: "rnop1_310", nome: "", codigo: "310", gvId: "gvop1_3" },
+    { id: "rnop1_401", nome: "", codigo: "401", gvId: "gvop1_4" },
+    { id: "rnop1_402", nome: "", codigo: "402", gvId: "gvop1_4" },
+    { id: "rnop1_403", nome: "", codigo: "403", gvId: "gvop1_4" },
+    { id: "rnop1_404", nome: "", codigo: "404", gvId: "gvop1_4" },
+    { id: "rnop1_405", nome: "", codigo: "405", gvId: "gvop1_4" },
+    { id: "rnop1_406", nome: "", codigo: "406", gvId: "gvop1_4" },
+    { id: "rnop1_407", nome: "", codigo: "407", gvId: "gvop1_4" },
+    { id: "rnop1_408", nome: "", codigo: "408", gvId: "gvop1_4" },
+    { id: "rnop1_411", nome: "", codigo: "411", gvId: "gvop1_4" },
+    { id: "rnop1_421", nome: "", codigo: "421", gvId: "gvop1_4" },
+    { id: "rnop2_101", nome: "", codigo: "101", gvId: "gvop2_1" },
+    { id: "rnop2_102", nome: "", codigo: "102", gvId: "gvop2_1" },
+    { id: "rnop2_103", nome: "", codigo: "103", gvId: "gvop2_1" },
+    { id: "rnop2_104", nome: "", codigo: "104", gvId: "gvop2_1" },
+    { id: "rnop2_105", nome: "", codigo: "105", gvId: "gvop2_1" },
+    { id: "rnop2_106", nome: "", codigo: "106", gvId: "gvop2_1" },
+    { id: "rnop2_107", nome: "", codigo: "107", gvId: "gvop2_1" },
+    { id: "rnop2_108", nome: "", codigo: "108", gvId: "gvop2_1" },
+    { id: "rnop2_109", nome: "", codigo: "109", gvId: "gvop2_1" },
+    { id: "rnop2_110", nome: "", codigo: "110", gvId: "gvop2_1" },
+    { id: "rnop2_111", nome: "", codigo: "111", gvId: "gvop2_1" },
+    { id: "rnop2_112", nome: "", codigo: "112", gvId: "gvop2_1" },
+    { id: "rnop2_121", nome: "", codigo: "121", gvId: "gvop2_1" },
+    { id: "rnop2_201", nome: "", codigo: "201", gvId: "gvop2_2" },
+    { id: "rnop2_202", nome: "", codigo: "202", gvId: "gvop2_2" },
+    { id: "rnop2_203", nome: "", codigo: "203", gvId: "gvop2_2" },
+    { id: "rnop2_204", nome: "", codigo: "204", gvId: "gvop2_2" },
+    { id: "rnop2_205", nome: "", codigo: "205", gvId: "gvop2_2" },
+    { id: "rnop2_206", nome: "", codigo: "206", gvId: "gvop2_2" },
+    { id: "rnop2_211", nome: "", codigo: "211", gvId: "gvop2_2" },
+    { id: "rnop3_101", nome: "", codigo: "101", gvId: "gvop3_1" },
+    { id: "rnop3_102", nome: "", codigo: "102", gvId: "gvop3_1" },
+    { id: "rnop3_103", nome: "", codigo: "103", gvId: "gvop3_1" },
+    { id: "rnop3_104", nome: "", codigo: "104", gvId: "gvop3_1" },
+    { id: "rnop3_105", nome: "", codigo: "105", gvId: "gvop3_1" },
+    { id: "rnop3_106", nome: "", codigo: "106", gvId: "gvop3_1" },
+    { id: "rnop3_107", nome: "", codigo: "107", gvId: "gvop3_1" },
+    { id: "rnop3_108", nome: "", codigo: "108", gvId: "gvop3_1" },
+    { id: "rnop3_121", nome: "", codigo: "121", gvId: "gvop3_1" },
+    { id: "rnop3_201", nome: "", codigo: "201", gvId: "gvop3_2" },
+    { id: "rnop3_202", nome: "", codigo: "202", gvId: "gvop3_2" },
+    { id: "rnop3_203", nome: "", codigo: "203", gvId: "gvop3_2" },
+    { id: "rnop3_204", nome: "", codigo: "204", gvId: "gvop3_2" },
+    { id: "rnop3_205", nome: "", codigo: "205", gvId: "gvop3_2" },
+    { id: "rnop3_206", nome: "", codigo: "206", gvId: "gvop3_2" },
+    { id: "rnop3_207", nome: "", codigo: "207", gvId: "gvop3_2" },
+    { id: "rnop3_221", nome: "", codigo: "221", gvId: "gvop3_2" },
+    { id: "rnop3_301", nome: "", codigo: "301", gvId: "gvop3_3" },
+    { id: "rnop3_302", nome: "", codigo: "302", gvId: "gvop3_3" },
+    { id: "rnop3_303", nome: "", codigo: "303", gvId: "gvop3_3" },
+    { id: "rnop3_304", nome: "", codigo: "304", gvId: "gvop3_3" },
+    { id: "rnop3_305", nome: "", codigo: "305", gvId: "gvop3_3" },
+    { id: "rnop3_306", nome: "", codigo: "306", gvId: "gvop3_3" },
+    { id: "rnop3_307", nome: "", codigo: "307", gvId: "gvop3_3" },
+    { id: "rnop3_308", nome: "", codigo: "308", gvId: "gvop3_3" },
+    { id: "rnop4_101", nome: "", codigo: "101", gvId: "gvop4_1" },
+    { id: "rnop4_102", nome: "", codigo: "102", gvId: "gvop4_1" },
+    { id: "rnop4_103", nome: "", codigo: "103", gvId: "gvop4_1" },
+    { id: "rnop4_104", nome: "", codigo: "104", gvId: "gvop4_1" },
+    { id: "rnop4_105", nome: "", codigo: "105", gvId: "gvop4_1" },
+    { id: "rnop4_106", nome: "", codigo: "106", gvId: "gvop4_1" },
+    { id: "rnop4_107", nome: "", codigo: "107", gvId: "gvop4_1" },
+    { id: "rnop4_108", nome: "", codigo: "108", gvId: "gvop4_1" },
+    { id: "rnop4_121", nome: "", codigo: "121", gvId: "gvop4_1" },
+    { id: "rnop4_122", nome: "", codigo: "122", gvId: "gvop4_1" },
+    { id: "rnop4_131", nome: "", codigo: "131", gvId: "gvop4_1" }
+  ]
+};
 
 /* ================================================================
    FIM DA CONFIGURAÇÃO
@@ -680,33 +819,50 @@ function nomeExibicaoRN(rn){
   return rn.codigo ? `RN ${rn.codigo}` : 'RN sem nome';
 }
 
-/* ---------------- Persistência da organização (Google Sheets via Apps Script) ---------------- */
+/* ---------------- Persistência da organização ----------------
+   Fonte de verdade atual: a base fica salva no navegador
+   (localStorage). Na primeira vez que o site abre, ela é semeada
+   com a BASE_INICIAL extraída da planilha. As edições feitas pela
+   tela Gerencial atualizam essa base local.
 
-async function carregarOrganizacaoDoBackend(){
-  try{
-    const resp = await fetch(`${APPS_SCRIPT_URL}?tipo=organizacao`);
-    const dados = await resp.json();
-    return {
-      gerentesComerciais: dados.gerentesComerciais || [],
-      operacoes: dados.operacoes || [],
-      gvs: dados.gvs || [],
-      rns: dados.rns || []
-    };
-  }catch(err){
-    mostrarToast('Não consegui carregar o cadastro. Verifique sua internet.');
-    return obterOrganizacaoVazia();
+   Observação: por enquanto a base é por navegador. A sincronização
+   entre dispositivos via Google Sheets fica para uma próxima etapa,
+   quando o backend estiver 100%.
+------------------------------------------------------------------ */
+
+const CHAVE_ORGANIZACAO = 'organizacao_cadastro_v2';
+
+function clonar(obj){
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function carregarOrganizacao(){
+  const bruto = localStorage.getItem(CHAVE_ORGANIZACAO);
+  if(bruto){
+    try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed abaixo */ }
   }
+  const semente = clonar(BASE_INICIAL);
+  localStorage.setItem(CHAVE_ORGANIZACAO, JSON.stringify(semente));
+  return semente;
 }
 
-async function salvarOrganizacaoNoBackend(org){
-  await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' }, // evita pre-flight de CORS
-    body: JSON.stringify({ tipo: 'organizacao', dados: org })
-  });
+function salvarOrganizacaoNoBackend(org){
+  localStorage.setItem(CHAVE_ORGANIZACAO, JSON.stringify(org));
+  return Promise.resolve({ ok: true });
 }
 
-let organizacao = obterOrganizacaoVazia();
+// Permite recarregar a base original da planilha, descartando edições locais.
+function restaurarBaseInicial(){
+  if(!confirm('Isso vai descartar todas as edições feitas e restaurar a base original da planilha. Continuar?')) return;
+  organizacao = clonar(BASE_INICIAL);
+  localStorage.setItem(CHAVE_ORGANIZACAO, JSON.stringify(organizacao));
+  const nivelAtivo = Object.keys(NIVEIS).find(k => document.getElementById(`adm-tab-${k}`).classList.contains('active')) || 'gc';
+  renderNivel(nivelAtivo);
+  atualizarSelectsDeLogin();
+  mostrarToast('Base original restaurada.');
+}
+
+let organizacao = carregarOrganizacao();
 
 
 /* ---------------- Estado em memória da sessão atual ---------------- */
@@ -734,33 +890,27 @@ function hojeISO(){
 }
 
 /* =====================================================================
-   PERSISTÊNCIA — Config diária e resultados, via Google Sheets
-   (Apps Script Web App configurado em APPS_SCRIPT_URL).
+   PERSISTÊNCIA — Config diária e resultados (localStorage por enquanto).
+   Quando o backend Google Sheets estiver 100%, estas 3 funções voltam
+   a usar fetch(APPS_SCRIPT_URL) como já preparamos antes.
 ===================================================================== */
 
 function salvarConfigDoDiaNoBackend(registro){
-  // registro = { gerenteId, operacaoId, data, categoriasAbertas: [ids] }
-  return fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ tipo: 'config', ...registro })
-  });
+  const chave = `desafios_config_${registro.gerenteId}_${registro.data}`;
+  localStorage.setItem(chave, JSON.stringify(registro));
+  return Promise.resolve({ ok: true });
 }
 
 function carregarConfigDoDiaDoBackend(gerenteId, data){
-  return fetch(`${APPS_SCRIPT_URL}?tipo=config&gerenteId=${encodeURIComponent(gerenteId)}&data=${encodeURIComponent(data)}`)
-    .then(resp => resp.json())
-    .then(dados => (dados && dados.categoriasAbertas) ? dados : null)
-    .catch(() => null);
+  const chave = `desafios_config_${gerenteId}_${data}`;
+  const bruto = localStorage.getItem(chave);
+  return Promise.resolve(bruto ? JSON.parse(bruto) : null);
 }
 
 function enviarValoresNoBackend(registro){
-  // registro = { vendedorId, gerenteId, operacaoId, data, valores: {catId: valor}, enviadoEm }
-  return fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ tipo: 'resultado', ...registro })
-  });
+  const chave = `desafios_resultado_${registro.vendedorId}_${registro.data}_${Date.now()}`;
+  localStorage.setItem(chave, JSON.stringify(registro));
+  return Promise.resolve({ ok: true });
 }
 
 
@@ -790,9 +940,8 @@ function inicializarTelaLoginGerente(){
   popularGerentesDoLogin();
 }
 
-async function abrirLoginGerente(){
+function abrirLoginGerente(){
   irPara('screen-gerente-login');
-  organizacao = await carregarOrganizacaoDoBackend();
   inicializarTelaLoginGerente();
 }
 
@@ -907,9 +1056,8 @@ function inicializarTelaLoginVendedor(){
   popularGerentesDoVendedorLogin();
 }
 
-async function abrirLoginVendedor(){
+function abrirLoginVendedor(){
   irPara('screen-vendedor-login');
-  organizacao = await carregarOrganizacaoDoBackend();
   inicializarTelaLoginVendedor();
 }
 
@@ -1032,20 +1180,24 @@ async function enviarValoresVendedor(){
 ===================================================================== */
 
 function abrirGerencial(){
+  const sel = document.getElementById('ger-cial-user');
+  sel.innerHTML = USUARIOS_GERENCIAIS.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
   document.getElementById('ger-cial-pin').value = '';
   document.getElementById('ger-cial-erro').textContent = '';
   irPara('screen-gerencial-login');
 }
 
-async function loginGerencial(){
+function loginGerencial(){
+  const userId = document.getElementById('ger-cial-user').value;
   const pin = document.getElementById('ger-cial-pin').value.trim();
   const erroEl = document.getElementById('ger-cial-erro');
-  if(pin !== SENHA_GERENCIAL){
+
+  const usuario = USUARIOS_GERENCIAIS.find(u => u.id === userId);
+  if(!usuario || pin !== usuario.senha){
     erroEl.textContent = 'Senha incorreta.';
     return;
   }
   erroEl.textContent = '';
-  organizacao = await carregarOrganizacaoDoBackend();
   irPara('screen-gerencial-dashboard');
   mostrarAbaGerencial('gc');
 }
