@@ -390,11 +390,11 @@
     <div class="home-title">Desafios <span style="color:var(--amber)">Diário</span></div>
     <div class="home-sub">Selecione como deseja entrar</div>
     <div class="role-grid">
-      <div class="role-card" onclick="irPara('screen-gerente-login')">
+      <div class="role-card" onclick="abrirLoginGerente()">
         <span class="icon">📋</span>
         <div class="label">Sou GV</div>
       </div>
-      <div class="role-card" onclick="irPara('screen-vendedor-login')">
+      <div class="role-card" onclick="abrirLoginVendedor()">
         <span class="icon">🎯</span>
         <div class="label">Sou RN</div>
       </div>
@@ -610,6 +610,9 @@ const CATEGORIAS = [
 // Senha para acessar o Painel Gerencial (botão "⚙ Gerencial" na Home)
 const SENHA_GERENCIAL = '2026';
 
+// URL do Web App do Google Apps Script (backend conectado ao Google Sheets)
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyDHFSXr1OGj-COPp2B9mzNtKzCVHhkkQACInGz8_z3BP8R8qwuxX2zqL5jBac1Tq6/exec';
+
 /* ================================================================
    FIM DA CONFIGURAÇÃO
 ================================================================ */
@@ -677,20 +680,33 @@ function nomeExibicaoRN(rn){
   return rn.codigo ? `RN ${rn.codigo}` : 'RN sem nome';
 }
 
-/* ---------------- Persistência da organização (localStorage por enquanto) ---------------- */
+/* ---------------- Persistência da organização (Google Sheets via Apps Script) ---------------- */
 
-function carregarOrganizacaoDoBackend(){
-  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL + '?tipo=organizacao')
-  const bruto = localStorage.getItem('organizacao_cadastro');
-  return bruto ? JSON.parse(bruto) : obterOrganizacaoVazia();
+async function carregarOrganizacaoDoBackend(){
+  try{
+    const resp = await fetch(`${APPS_SCRIPT_URL}?tipo=organizacao`);
+    const dados = await resp.json();
+    return {
+      gerentesComerciais: dados.gerentesComerciais || [],
+      operacoes: dados.operacoes || [],
+      gvs: dados.gvs || [],
+      rns: dados.rns || []
+    };
+  }catch(err){
+    mostrarToast('Não consegui carregar o cadastro. Verifique sua internet.');
+    return obterOrganizacaoVazia();
+  }
 }
 
-function salvarOrganizacaoNoBackend(org){
-  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL, {method:'POST', body: JSON.stringify({tipo:'organizacao', dados:org})})
-  localStorage.setItem('organizacao_cadastro', JSON.stringify(org));
+async function salvarOrganizacaoNoBackend(org){
+  await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, // evita pre-flight de CORS
+    body: JSON.stringify({ tipo: 'organizacao', dados: org })
+  });
 }
 
-let organizacao = carregarOrganizacaoDoBackend();
+let organizacao = obterOrganizacaoVazia();
 
 
 /* ---------------- Estado em memória da sessão atual ---------------- */
@@ -718,35 +734,33 @@ function hojeISO(){
 }
 
 /* =====================================================================
-   PERSISTÊNCIA — POR ENQUANTO USANDO localStorage COMO SIMULAÇÃO.
-
-   Nas duas funções abaixo (salvarConfigDoDiaNoBackend e
-   enviarValoresNoBackend) é onde, na próxima etapa, entra a chamada
-   fetch() para o Web App do Google Apps Script (doPost / doGet).
-   O resto do sistema não precisa mudar quando isso for trocado.
+   PERSISTÊNCIA — Config diária e resultados, via Google Sheets
+   (Apps Script Web App configurado em APPS_SCRIPT_URL).
 ===================================================================== */
 
 function salvarConfigDoDiaNoBackend(registro){
   // registro = { gerenteId, operacaoId, data, categoriasAbertas: [ids] }
-  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({tipo:'config', ...registro}) })
-  const chave = `desafios_config_${registro.gerenteId}_${registro.data}`;
-  localStorage.setItem(chave, JSON.stringify(registro));
-  return Promise.resolve({ ok: true });
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ tipo: 'config', ...registro })
+  });
 }
 
 function carregarConfigDoDiaDoBackend(gerenteId, data){
-  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL + '?tipo=config&gerenteId=...&data=...')
-  const chave = `desafios_config_${gerenteId}_${data}`;
-  const bruto = localStorage.getItem(chave);
-  return Promise.resolve(bruto ? JSON.parse(bruto) : null);
+  return fetch(`${APPS_SCRIPT_URL}?tipo=config&gerenteId=${encodeURIComponent(gerenteId)}&data=${encodeURIComponent(data)}`)
+    .then(resp => resp.json())
+    .then(dados => (dados && dados.categoriasAbertas) ? dados : null)
+    .catch(() => null);
 }
 
 function enviarValoresNoBackend(registro){
   // registro = { vendedorId, gerenteId, operacaoId, data, valores: {catId: valor}, enviadoEm }
-  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({tipo:'resultado', ...registro}) })
-  const chave = `desafios_resultado_${registro.vendedorId}_${registro.data}_${Date.now()}`;
-  localStorage.setItem(chave, JSON.stringify(registro));
-  return Promise.resolve({ ok: true });
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ tipo: 'resultado', ...registro })
+  });
 }
 
 
@@ -774,6 +788,12 @@ function inicializarTelaLoginGerente(){
   const selOp = document.getElementById('ger-operacao');
   preencherSelect(selOp, organizacao.operacoes, 'id', 'nome', null);
   popularGerentesDoLogin();
+}
+
+async function abrirLoginGerente(){
+  irPara('screen-gerente-login');
+  organizacao = await carregarOrganizacaoDoBackend();
+  inicializarTelaLoginGerente();
 }
 
 function popularGerentesDoLogin(){
@@ -885,6 +905,12 @@ function inicializarTelaLoginVendedor(){
   const selOp = document.getElementById('ven-operacao');
   preencherSelect(selOp, organizacao.operacoes, 'id', 'nome', null);
   popularGerentesDoVendedorLogin();
+}
+
+async function abrirLoginVendedor(){
+  irPara('screen-vendedor-login');
+  organizacao = await carregarOrganizacaoDoBackend();
+  inicializarTelaLoginVendedor();
 }
 
 function popularGerentesDoVendedorLogin(){
@@ -1011,7 +1037,7 @@ function abrirGerencial(){
   irPara('screen-gerencial-login');
 }
 
-function loginGerencial(){
+async function loginGerencial(){
   const pin = document.getElementById('ger-cial-pin').value.trim();
   const erroEl = document.getElementById('ger-cial-erro');
   if(pin !== SENHA_GERENCIAL){
@@ -1019,6 +1045,7 @@ function loginGerencial(){
     return;
   }
   erroEl.textContent = '';
+  organizacao = await carregarOrganizacaoDoBackend();
   irPara('screen-gerencial-dashboard');
   mostrarAbaGerencial('gc');
 }
@@ -1103,7 +1130,7 @@ function renderFormNivel(nivel){
   `;
 }
 
-function salvarItemNivel(nivel){
+async function salvarItemNivel(nivel){
   const cfg = NIVEIS[nivel];
   const valores = {};
 
@@ -1136,7 +1163,7 @@ function salvarItemNivel(nivel){
     arr.push(valores);
   }
 
-  salvarOrganizacaoNoBackend(organizacao);
+  await salvarOrganizacaoNoBackend(organizacao);
   renderNivel(nivel);
   atualizarSelectsDeLogin();
   mostrarToast('Salvo com sucesso.');
@@ -1164,10 +1191,10 @@ function cancelarEdicaoNivel(nivel){
   renderFormNivel(nivel);
 }
 
-function excluirItemNivel(nivel, id){
+async function excluirItemNivel(nivel, id){
   if(!confirm('Excluir este registro? Registros vinculados abaixo dele (se houver) também serão excluídos. Essa ação não pode ser desfeita.')) return;
   excluirRecursivo(nivel, id);
-  salvarOrganizacaoNoBackend(organizacao);
+  await salvarOrganizacaoNoBackend(organizacao);
   renderNivel(nivel);
   atualizarSelectsDeLogin();
 }
@@ -1215,7 +1242,7 @@ function processarArquivoImportacao(event){
   event.target.value = '';
 }
 
-function importarLinhasParaOrganizacao(linhas){
+async function importarLinhasParaOrganizacao(linhas){
   if(linhas.length === 0){
     mostrarToast('A planilha está vazia.');
     return;
@@ -1278,7 +1305,7 @@ function importarLinhasParaOrganizacao(linhas){
   });
 
   organizacao = nova;
-  salvarOrganizacaoNoBackend(organizacao);
+  await salvarOrganizacaoNoBackend(organizacao);
   renderNivel(document.querySelector('.tab-btn.active') ? Object.keys(NIVEIS).find(k => document.getElementById(`adm-tab-${k}`).classList.contains('active')) : 'gc');
   atualizarSelectsDeLogin();
   mostrarToast(`Importado: ${nova.gerentesComerciais.length} gerente(s) comercial(is), ${nova.operacoes.length} operação(ões), ${nova.gvs.length} GV(s), ${nova.rns.length} RN(s).`);
@@ -1286,8 +1313,10 @@ function importarLinhasParaOrganizacao(linhas){
 
 
 /* ---------------- Inicialização geral ---------------- */
-inicializarTelaLoginGerente();
-inicializarTelaLoginVendedor();
+// As listas de Operação/GV/RN e o cadastro do Painel Gerencial são
+// buscados do Google Sheets no momento em que cada tela é aberta
+// (ver abrirLoginGerente, abrirLoginVendedor, loginGerencial), então
+// não é necessário carregar nada de forma síncrona aqui.
 
 </script>
 </body>
