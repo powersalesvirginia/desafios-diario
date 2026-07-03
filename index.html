@@ -650,13 +650,24 @@
       <button class="back-btn" onclick="logoutGerencial()">Sair</button>
     </div>
 
-    <div class="subtabs">
-      <button class="subtab-btn active" id="subtab-equipe" onclick="mostrarSubAba('equipe')">Cadastro Equipe de Vendas</button>
-      <button class="subtab-btn" id="subtab-categorias" onclick="mostrarSubAba('categorias')">Categorias</button>
+    <!-- ===== MENU DO GERENCIAL ===== -->
+    <div id="subpainel-menu">
+      <div class="home-sub" style="margin-top:8px; margin-bottom:24px;">O que você deseja gerenciar?</div>
+      <div class="role-grid">
+        <div class="role-card" onclick="mostrarSubAba('equipe')">
+          <span class="icon">👥</span>
+          <div class="label">Cadastro Equipe de Vendas</div>
+        </div>
+        <div class="role-card" onclick="mostrarSubAba('categorias')">
+          <span class="icon">🏆</span>
+          <div class="label">Categorias</div>
+        </div>
+      </div>
     </div>
 
     <!-- ===== SUB-ABA: CADASTRO EQUIPE DE VENDAS ===== -->
-    <div id="subpainel-equipe">
+    <div id="subpainel-equipe" style="display:none;">
+      <button class="back-btn" style="margin-bottom:16px;" onclick="voltarMenuGerencial()">← Voltar ao menu</button>
       <div class="panel">
         <h2>Importar / Exportar Excel</h2>
         <div class="hint">
@@ -711,6 +722,7 @@
 
     <!-- ===== SUB-ABA: CATEGORIAS ===== -->
     <div id="subpainel-categorias" style="display:none;">
+      <button class="back-btn" style="margin-bottom:16px;" onclick="voltarMenuGerencial()">← Voltar ao menu</button>
       <div class="panel">
         <h2>Categorias de desafios</h2>
         <div class="hint">
@@ -1405,8 +1417,7 @@ function loginGerencial(){
   }
   erroEl.textContent = '';
   irPara('screen-gerencial-dashboard');
-  mostrarSubAba('equipe');
-  mostrarAbaGerencial('gc');
+  voltarMenuGerencial();
 }
 
 function logoutGerencial(){
@@ -1423,11 +1434,17 @@ function mostrarAbaGerencial(nivel){
 
 /* ---------------- Sub-abas do Painel Gerencial ---------------- */
 
+function voltarMenuGerencial(){
+  document.getElementById('subpainel-menu').style.display = 'block';
+  document.getElementById('subpainel-equipe').style.display = 'none';
+  document.getElementById('subpainel-categorias').style.display = 'none';
+}
+
 function mostrarSubAba(qual){
-  document.getElementById('subtab-equipe').classList.toggle('active', qual === 'equipe');
-  document.getElementById('subtab-categorias').classList.toggle('active', qual === 'categorias');
+  document.getElementById('subpainel-menu').style.display = 'none';
   document.getElementById('subpainel-equipe').style.display = (qual === 'equipe') ? 'block' : 'none';
   document.getElementById('subpainel-categorias').style.display = (qual === 'categorias') ? 'block' : 'none';
+  if(qual === 'equipe') mostrarAbaGerencial('gc');
   if(qual === 'categorias') renderCategorias();
 }
 
@@ -1470,6 +1487,7 @@ function renderCategorias(){
         <div class="actions">
           <button class="mini-btn" onclick="editarCategoria('${cat.id}')">Editar</button>
           ${btnStatus}
+          <button class="mini-btn danger" onclick="excluirCategoria('${cat.id}')">Excluir</button>
         </div>
       </div>`;
   }).join('');
@@ -1508,6 +1526,40 @@ async function alternarCategoria(id){
   await salvarCategorias();
   renderCategorias();
   mostrarToast(cat.ativa ? 'Categoria reativada.' : 'Categoria inativada.');
+}
+
+// Verifica se a categoria está em uso em algum desafio já aberto (config diária).
+function categoriaEmUso(catId){
+  for(let i = 0; i < localStorage.length; i++){
+    const chave = localStorage.key(i);
+    if(chave && chave.startsWith('desafios_config_')){
+      try{
+        const registro = JSON.parse(localStorage.getItem(chave));
+        if(registro && Array.isArray(registro.categoriasAbertas) && registro.categoriasAbertas.includes(catId)){
+          return true;
+        }
+      }catch(e){ /* ignora registro inválido */ }
+    }
+  }
+  return false;
+}
+
+async function excluirCategoria(id){
+  const cat = categorias.find(c => c.id === id);
+  if(!cat) return;
+
+  if(categoriaEmUso(id)){
+    alert(`Não é possível excluir "${cat.label}" porque ela já foi usada em desafios abertos.\n\nSe quiser removê-la das opções dos GVs sem apagar o histórico, use a opção "Inativar".`);
+    return;
+  }
+
+  if(!confirm(`Excluir definitivamente "${cat.label}"? Esta ação não pode ser desfeita.`)) return;
+
+  const idx = categorias.findIndex(c => c.id === id);
+  if(idx > -1) categorias.splice(idx, 1);
+  await salvarCategorias();
+  renderCategorias();
+  mostrarToast('Categoria excluída.');
 }
 
 let categoriaEditando = null;
