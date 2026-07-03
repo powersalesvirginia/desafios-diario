@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Desafios Diário — Campeonato Diário</title>
+<link rel="icon" type="image/png" href="assets/logo-virginia-circulo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ---- Identidade visual: Black Piano ---- */
+    --board:#0B0B0D;
+    --board-light:#18181B;
+    --board-lighter:#232327;
+    --chalk:#F5F3EE;
+    --chalk-dim:#9C9A96;
+    --amber:#C9A227;
+    --amber-deep:#A6841E;
+    --success:#6FAE7C;
+    --danger:#D4574A;
+    --divider:rgba(245,243,238,0.09);
+    --radius:10px;
+    --font-display:'Oswald', sans-serif;
+    --font-body:'Inter', sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at top left, rgba(201,162,39,0.05), transparent 55%),
+      radial-gradient(ellipse at bottom right, rgba(255,255,255,0.02), transparent 60%),
+      var(--board);
+    color:var(--chalk);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  #app{
+    max-width:640px;
+    margin:0 auto;
+    padding:20px 16px 24px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .screen{ display:none; }
+  .screen.active{ display:block; animation:fadein .25s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ---------- Cabeçalho comum ---------- */
+  .top-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:22px;
+  }
+  .brand{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:22px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--chalk);
+  }
+  .brand span{ color:var(--amber); }
+  .back-btn{
+    background:none;
+    border:1px solid var(--divider);
+    color:var(--chalk-dim);
+    border-radius:8px;
+    padding:8px 12px;
+    font-family:var(--font-body);
+    font-size:13px;
+    cursor:pointer;
+  }
+  .back-btn:hover{ border-color:var(--amber); color:var(--amber); }
+
+  /* ---------- Cartões / painéis ---------- */
+  .panel{
+    background:var(--board-light);
+    border:1px solid var(--divider);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .panel h2{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:16px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    margin:0 0 14px 0;
+    color:var(--amber);
+  }
+  .hint{
+    font-size:12.5px;
+    color:var(--chalk-dim);
+    margin-top:-8px;
+    margin-bottom:14px;
+    line-height:1.5;
+  }
+
+  /* ---------- Home ---------- */
+  .home-title{
+    font-family:var(--font-display);
+    font-size:26px;
+    font-weight:700;
+    text-transform:uppercase;
+    text-align:center;
+    margin:40px 0 6px;
+  }
+  .home-sub{
+    text-align:center;
+    color:var(--chalk-dim);
+    font-size:14px;
+    margin-bottom:36px;
+  }
+  .role-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+  .role-card{
+    background:var(--board-light);
+    border:1px solid var(--divider);
+    border-radius:var(--radius);
+    padding:28px 14px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s, transform .15s;
+  }
+  .role-card:hover{ border-color:var(--amber); transform:translateY(-2px); }
+  .role-card .icon{ font-size:30px; margin-bottom:10px; display:block; }
+  .role-card .label{
+    font-family:var(--font-display);
+    text-transform:uppercase;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:0.4px;
+  }
+
+  /* ---------- Formulários ---------- */
+  label{
+    display:block;
+    font-size:12.5px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    color:var(--chalk-dim);
+    margin-bottom:6px;
+    margin-top:14px;
+  }
+  label:first-child{ margin-top:0; }
+  select, input[type="date"], input[type="password"], input[type="number"], input[type="text"]{
+    width:100%;
+    background:var(--board);
+    border:1px solid var(--divider);
+    color:var(--chalk);
+    border-radius:8px;
+    padding:11px 12px;
+    font-family:var(--font-body);
+    font-size:15px;
+    outline:none;
+  }
+  select:focus, input:focus{ border-color:var(--amber); }
+  select:disabled{ opacity:0.4; }
+
+  .primary-btn{
+    width:100%;
+    margin-top:22px;
+    background:var(--amber);
+    color:#1B2C24;
+    border:none;
+    border-radius:8px;
+    padding:13px;
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:15px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    cursor:pointer;
+  }
+  .primary-btn:hover{ background:var(--amber-deep); }
+  .primary-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .error-msg{
+    color:var(--danger);
+    font-size:13px;
+    margin-top:10px;
+    min-height:16px;
+  }
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:24px;
+    transform:translateX(-50%);
+    background:var(--success);
+    color:#132018;
+    padding:12px 18px;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    z-index:999;
+    display:none;
+  }
+
+  /* ---------- Checklist de categorias (tela gerente) ---------- */
+  .cat-toggle-list{ display:flex; flex-direction:column; gap:8px; }
+  .cat-toggle{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--board);
+    border:1px solid var(--divider);
+    border-radius:8px;
+    padding:11px 14px;
+    cursor:pointer;
+  }
+  .cat-toggle.on{ border-color:var(--amber); }
+  .cat-toggle .name{ font-size:14px; }
+  .switch{
+    width:38px; height:22px;
+    background:#3A4A43;
+    border-radius:20px;
+    position:relative;
+    flex-shrink:0;
+    transition:background .15s;
+  }
+  .cat-toggle.on .switch{ background:var(--amber); }
+  .switch::after{
+    content:'';
+    position:absolute;
+    top:2px; left:2px;
+    width:18px; height:18px;
+    background:var(--chalk);
+    border-radius:50%;
+    transition:left .15s;
+  }
+  .cat-toggle.on .switch::after{ left:18px; }
+
+  /* ---------- Inputs de valores (tela vendedor) ---------- */
+  .value-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:12px 0;
+    border-bottom:1px solid var(--divider);
+  }
+  .value-row:last-child{ border-bottom:none; }
+  .value-row .name{ font-size:14px; flex:1; }
+  .value-row input{ width:110px; text-align:right; }
+
+  .empty-state{
+    text-align:center;
+    color:var(--chalk-dim);
+    font-size:14px;
+    padding:30px 10px;
+    line-height:1.6;
+  }
+
+  .badge{
+    display:inline-block;
+    background:var(--board);
+    border:1px solid var(--divider);
+    color:var(--chalk-dim);
+    font-size:12px;
+    padding:4px 10px;
+    border-radius:20px;
+    margin-bottom:14px;
+  }
+
+  .app-footer{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    margin-top:auto;
+    padding-top:22px;
+    padding-bottom:6px;
+    border-top:1px solid var(--divider);
+  }
+  .app-footer img{
+    height:20px;
+    width:auto;
+    opacity:0.9;
+  }
+  .app-footer .footer-text{
+    font-size:11px;
+    letter-spacing:0.6px;
+    text-transform:uppercase;
+    color:var(--chalk-dim);
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============================================================= -->
+  <!-- TELA: HOME                                                     -->
+  <!-- ============================================================= -->
+  <div class="screen active" id="screen-home">
+    <div class="home-title">Desafios <span style="color:var(--amber)">Diário</span></div>
+    <div class="home-sub">Selecione como deseja entrar</div>
+    <div class="role-grid">
+      <div class="role-card" onclick="irPara('screen-gerente-login')">
+        <span class="icon">📋</span>
+        <div class="label">Sou Gerente</div>
+      </div>
+      <div class="role-card" onclick="irPara('screen-vendedor-login')">
+        <span class="icon">🎯</span>
+        <div class="label">Sou Vendedor</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- TELA: LOGIN GERENTE                                            -->
+  <!-- ============================================================= -->
+  <div class="screen" id="screen-gerente-login">
+    <div class="top-bar">
+      <div class="brand">Área do <span>Gerente</span></div>
+      <button class="back-btn" onclick="irPara('screen-home')">← Voltar</button>
+    </div>
+
+    <div class="panel">
+      <h2>Identificação</h2>
+      <label for="ger-operacao">Operação</label>
+      <select id="ger-operacao" onchange="popularGerentesDoLogin()"></select>
+
+      <label for="ger-select">Gerente</label>
+      <select id="ger-select"></select>
+
+      <label for="ger-pin">PIN</label>
+      <input type="password" id="ger-pin" inputmode="numeric" maxlength="6" placeholder="••••">
+
+      <div class="error-msg" id="ger-login-erro"></div>
+      <button class="primary-btn" onclick="loginGerente()">Entrar</button>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- TELA: DASHBOARD GERENTE                                        -->
+  <!-- ============================================================= -->
+  <div class="screen" id="screen-gerente-dashboard">
+    <div class="top-bar">
+      <div class="brand">Painel do <span>Gerente</span></div>
+      <button class="back-btn" onclick="logoutGerente()">Sair</button>
+    </div>
+
+    <div class="badge" id="ger-dashboard-nome">—</div>
+
+    <div class="panel">
+      <h2>Data de referência dos desafios</h2>
+      <div class="hint">Escolha o dia a que esses desafios se referem. Você pode montar os desafios de amanhã com antecedência, por exemplo.</div>
+      <input type="date" id="ger-data-referencia" onchange="carregarConfigDoDia()">
+    </div>
+
+    <div class="panel">
+      <h2>Desafios abertos nesse dia</h2>
+      <div class="hint">Ative apenas as categorias que valem para esse dia. Só o que estiver ativo aqui vai aparecer para os vendedores desse time.</div>
+      <div class="cat-toggle-list" id="ger-cat-list"></div>
+      <button class="primary-btn" onclick="salvarConfigDoDia()">Salvar desafios do dia</button>
+      <div class="error-msg" id="ger-save-status"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- TELA: LOGIN VENDEDOR                                           -->
+  <!-- ============================================================= -->
+  <div class="screen" id="screen-vendedor-login">
+    <div class="top-bar">
+      <div class="brand">Área do <span>Vendedor</span></div>
+      <button class="back-btn" onclick="irPara('screen-home')">← Voltar</button>
+    </div>
+
+    <div class="panel">
+      <h2>Identificação</h2>
+      <label for="ven-operacao">Operação</label>
+      <select id="ven-operacao" onchange="popularGerentesDoVendedorLogin()"></select>
+
+      <label for="ven-gerente">Gerente</label>
+      <select id="ven-gerente" onchange="popularVendedoresDoLogin()"></select>
+
+      <label for="ven-select">Seu nome</label>
+      <select id="ven-select"></select>
+
+      <div class="error-msg" id="ven-login-erro"></div>
+      <button class="primary-btn" onclick="loginVendedor()">Entrar</button>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- TELA: DESAFIOS DO VENDEDOR                                     -->
+  <!-- ============================================================= -->
+  <div class="screen" id="screen-vendedor-desafios">
+    <div class="top-bar">
+      <div class="brand">Meus <span>Desafios</span></div>
+      <button class="back-btn" onclick="logoutVendedor()">Sair</button>
+    </div>
+
+    <div class="badge" id="ven-dashboard-nome">—</div>
+
+    <div class="panel">
+      <h2 id="ven-data-titulo">Desafios de hoje</h2>
+      <div id="ven-lista-container"></div>
+      <button class="primary-btn" id="ven-enviar-btn" onclick="enviarValoresVendedor()" style="display:none;">Enviar resultados</button>
+      <div class="error-msg" id="ven-save-status"></div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <img src="assets/logo-virginia-branco.png" alt="Virginia">
+    <span class="footer-text">Created by Power Sales Team</span>
+  </footer>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================================================================
+   CONFIGURAÇÃO — EDITE SOMENTE AQUI PARA AJUSTAR O SISTEMA
+   ================================================================
+   Nenhuma outra parte do código precisa ser tocada para:
+   - adicionar/remover uma categoria de desafio
+   - adicionar/remover uma operação, gerente ou vendedor
+
+   HIERARQUIA DE CHAVES (IDs):
+     OPERACAO  (id próprio)
+       -> GERENTE   (guarda operacaoId apontando pra sua operação)
+            -> VENDEDOR (guarda gerenteId apontando pro seu gerente)
+
+   Use IDs curtos e sem espaço (ex: 'OP01', 'GER03', 'VEN014').
+   Esses IDs são o que efetivamente vai ser salvo nas linhas da
+   planilha do Google Sheets — os nomes são só pra exibição.
+================================================================ */
+
+const CATEGORIAS = [
+  { id: 'VOLUME_CERVEJA',        label: 'Volume Cerveja' },
+  { id: 'VOLUME_RGB',            label: 'Volume RGB' },
+  { id: 'VOLUME_HIGH_END',       label: 'Volume High End' },
+  { id: 'VOLUME_NAB',            label: 'Volume NAB' },
+  { id: 'TASKS_TOTAIS',          label: 'Tasks Totais' },
+  { id: 'DISTRIBUICAO_RGB',      label: 'Distribuição RGB' },
+  { id: 'COMPRADORES_STELLA_PG', label: 'Compradores Stella PG' },
+  { id: 'TASKS_COMPRA',          label: 'Tasks de Compra' },
+  { id: 'MIX_S5',                label: 'Mix S5' },
+  { id: 'FATURAMENTO_SCORE5',    label: 'Faturamento Score5' },
+  { id: 'MIX_LN',                label: 'Mix +LN' },
+  // Para adicionar uma nova categoria, copie a linha abaixo e edite:
+  // { id: 'NOVA_CATEGORIA', label: 'Nome que aparece na tela' },
+];
+
+const OPERACOES = [
+  { id: 'OP01', nome: 'Operação Curitiba' },
+  { id: 'OP02', nome: 'Operação Litoral' },
+  // { id: 'OP03', nome: 'Nova Operação' },
+];
+
+const GERENTES = [
+  { id: 'GER01', nome: 'João Silva',   operacaoId: 'OP01', pin: '1234' },
+  { id: 'GER02', nome: 'Marcos Lima',  operacaoId: 'OP02', pin: '1234' },
+  // { id: 'GER03', nome: 'Nome do Gerente', operacaoId: 'OP01', pin: '0000' },
+];
+
+const VENDEDORES = [
+  { id: 'VEN01', nome: 'Maria Souza',   gerenteId: 'GER01' },
+  { id: 'VEN02', nome: 'Pedro Torres',  gerenteId: 'GER01' },
+  { id: 'VEN03', nome: 'Ana Ferreira',  gerenteId: 'GER02' },
+  // { id: 'VEN04', nome: 'Nome do Vendedor', gerenteId: 'GER01' },
+];
+
+/* ================================================================
+   FIM DA CONFIGURAÇÃO
+================================================================ */
+
+
+/* ---------------- Estado em memória da sessão atual ---------------- */
+let sessaoGerente = null;   // { gerenteId, nome, operacaoId }
+let sessaoVendedor = null;  // { vendedorId, nome, gerenteId }
+
+/* ---------------- Navegação simples entre telas ---------------- */
+function irPara(idTela){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(idTela).classList.add('active');
+}
+
+function mostrarToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2200);
+}
+
+function hojeISO(){
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off * 60000);
+  return local.toISOString().slice(0,10);
+}
+
+/* =====================================================================
+   PERSISTÊNCIA — POR ENQUANTO USANDO localStorage COMO SIMULAÇÃO.
+
+   Nas duas funções abaixo (salvarConfigDoDiaNoBackend e
+   enviarValoresNoBackend) é onde, na próxima etapa, entra a chamada
+   fetch() para o Web App do Google Apps Script (doPost / doGet).
+   O resto do sistema não precisa mudar quando isso for trocado.
+===================================================================== */
+
+function salvarConfigDoDiaNoBackend(registro){
+  // registro = { gerenteId, operacaoId, data, categoriasAbertas: [ids] }
+  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({tipo:'config', ...registro}) })
+  const chave = `desafios_config_${registro.gerenteId}_${registro.data}`;
+  localStorage.setItem(chave, JSON.stringify(registro));
+  return Promise.resolve({ ok: true });
+}
+
+function carregarConfigDoDiaDoBackend(gerenteId, data){
+  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL + '?tipo=config&gerenteId=...&data=...')
+  const chave = `desafios_config_${gerenteId}_${data}`;
+  const bruto = localStorage.getItem(chave);
+  return Promise.resolve(bruto ? JSON.parse(bruto) : null);
+}
+
+function enviarValoresNoBackend(registro){
+  // registro = { vendedorId, gerenteId, operacaoId, data, valores: {catId: valor}, enviadoEm }
+  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({tipo:'resultado', ...registro}) })
+  const chave = `desafios_resultado_${registro.vendedorId}_${registro.data}_${Date.now()}`;
+  localStorage.setItem(chave, JSON.stringify(registro));
+  return Promise.resolve({ ok: true });
+}
+
+
+/* =====================================================================
+   LOGIN — GERENTE
+===================================================================== */
+
+function preencherSelect(select, itens, campoValor, campoTexto, placeholder){
+  select.innerHTML = '';
+  if(placeholder){
+    const op = document.createElement('option');
+    op.value = '';
+    op.textContent = placeholder;
+    select.appendChild(op);
+  }
+  itens.forEach(item => {
+    const op = document.createElement('option');
+    op.value = item[campoValor];
+    op.textContent = item[campoTexto];
+    select.appendChild(op);
+  });
+}
+
+function inicializarTelaLoginGerente(){
+  const selOp = document.getElementById('ger-operacao');
+  preencherSelect(selOp, OPERACOES, 'id', 'nome', null);
+  popularGerentesDoLogin();
+}
+
+function popularGerentesDoLogin(){
+  const opId = document.getElementById('ger-operacao').value;
+  const lista = GERENTES.filter(g => g.operacaoId === opId);
+  preencherSelect(document.getElementById('ger-select'), lista, 'id', 'nome', null);
+}
+
+function loginGerente(){
+  const gerenteId = document.getElementById('ger-select').value;
+  const pin = document.getElementById('ger-pin').value.trim();
+  const erroEl = document.getElementById('ger-login-erro');
+  erroEl.textContent = '';
+
+  const gerente = GERENTES.find(g => g.id === gerenteId);
+  if(!gerente){
+    erroEl.textContent = 'Selecione um gerente válido.';
+    return;
+  }
+  if(pin !== gerente.pin){
+    erroEl.textContent = 'PIN incorreto.';
+    return;
+  }
+
+  sessaoGerente = { gerenteId: gerente.id, nome: gerente.nome, operacaoId: gerente.operacaoId };
+  document.getElementById('ger-dashboard-nome').textContent = gerente.nome;
+  document.getElementById('ger-data-referencia').value = hojeISO();
+  document.getElementById('ger-pin').value = '';
+
+  renderizarChecklistCategorias();
+  carregarConfigDoDia();
+  irPara('screen-gerente-dashboard');
+}
+
+function logoutGerente(){
+  sessaoGerente = null;
+  irPara('screen-home');
+}
+
+/* ---------------- Dashboard do gerente: seleção de categorias ---------------- */
+
+function renderizarChecklistCategorias(){
+  const container = document.getElementById('ger-cat-list');
+  container.innerHTML = '';
+  CATEGORIAS.forEach(cat => {
+    const row = document.createElement('div');
+    row.className = 'cat-toggle';
+    row.dataset.catId = cat.id;
+    row.onclick = () => row.classList.toggle('on');
+    row.innerHTML = `<span class="name">${cat.label}</span><span class="switch"></span>`;
+    container.appendChild(row);
+  });
+}
+
+async function carregarConfigDoDia(){
+  if(!sessaoGerente) return;
+  const data = document.getElementById('ger-data-referencia').value || hojeISO();
+  const statusEl = document.getElementById('ger-save-status');
+  statusEl.textContent = '';
+
+  const config = await carregarConfigDoDiaDoBackend(sessaoGerente.gerenteId, data);
+  const abertas = config ? config.categoriasAbertas : [];
+
+  document.querySelectorAll('#ger-cat-list .cat-toggle').forEach(row => {
+    row.classList.toggle('on', abertas.includes(row.dataset.catId));
+  });
+}
+
+async function salvarConfigDoDia(){
+  if(!sessaoGerente) return;
+  const data = document.getElementById('ger-data-referencia').value;
+  const statusEl = document.getElementById('ger-save-status');
+
+  if(!data){
+    statusEl.textContent = 'Selecione a data de referência.';
+    return;
+  }
+
+  const abertas = Array.from(document.querySelectorAll('#ger-cat-list .cat-toggle.on'))
+    .map(row => row.dataset.catId);
+
+  const registro = {
+    gerenteId: sessaoGerente.gerenteId,
+    operacaoId: sessaoGerente.operacaoId,
+    data: data,
+    categoriasAbertas: abertas
+  };
+
+  statusEl.style.color = 'var(--chalk-dim)';
+  statusEl.textContent = 'Salvando...';
+
+  await salvarConfigDoDiaNoBackend(registro);
+
+  statusEl.textContent = '';
+  mostrarToast(`Desafios de ${formatarDataBR(data)} salvos (${abertas.length} categoria(s)).`);
+}
+
+function formatarDataBR(iso){
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+
+/* =====================================================================
+   LOGIN — VENDEDOR
+===================================================================== */
+
+function inicializarTelaLoginVendedor(){
+  const selOp = document.getElementById('ven-operacao');
+  preencherSelect(selOp, OPERACOES, 'id', 'nome', null);
+  popularGerentesDoVendedorLogin();
+}
+
+function popularGerentesDoVendedorLogin(){
+  const opId = document.getElementById('ven-operacao').value;
+  const lista = GERENTES.filter(g => g.operacaoId === opId);
+  preencherSelect(document.getElementById('ven-gerente'), lista, 'id', 'nome', null);
+  popularVendedoresDoLogin();
+}
+
+function popularVendedoresDoLogin(){
+  const gerenteId = document.getElementById('ven-gerente').value;
+  const lista = VENDEDORES.filter(v => v.gerenteId === gerenteId);
+  preencherSelect(document.getElementById('ven-select'), lista, 'id', 'nome', null);
+}
+
+async function loginVendedor(){
+  const vendedorId = document.getElementById('ven-select').value;
+  const gerenteId = document.getElementById('ven-gerente').value;
+  const erroEl = document.getElementById('ven-login-erro');
+  erroEl.textContent = '';
+
+  const vendedor = VENDEDORES.find(v => v.id === vendedorId);
+  const gerente = GERENTES.find(g => g.id === gerenteId);
+
+  if(!vendedor || !gerente){
+    erroEl.textContent = 'Selecione seu gerente e seu nome.';
+    return;
+  }
+
+  sessaoVendedor = {
+    vendedorId: vendedor.id,
+    nome: vendedor.nome,
+    gerenteId: gerente.id,
+    operacaoId: gerente.operacaoId
+  };
+
+  document.getElementById('ven-dashboard-nome').textContent = `${vendedor.nome} · time de ${gerente.nome}`;
+  await carregarDesafiosDoVendedor();
+  irPara('screen-vendedor-desafios');
+}
+
+function logoutVendedor(){
+  sessaoVendedor = null;
+  irPara('screen-home');
+}
+
+/* ---------------- Tela de desafios do vendedor ---------------- */
+
+async function carregarDesafiosDoVendedor(){
+  if(!sessaoVendedor) return;
+  const data = hojeISO();
+  document.getElementById('ven-data-titulo').textContent = `Desafios de ${formatarDataBR(data)}`;
+
+  const container = document.getElementById('ven-lista-container');
+  const btnEnviar = document.getElementById('ven-enviar-btn');
+  container.innerHTML = '<div class="empty-state">Carregando...</div>';
+
+  const config = await carregarConfigDoDiaDoBackend(sessaoVendedor.gerenteId, data);
+  const abertasIds = config ? config.categoriasAbertas : [];
+  const categoriasAbertas = CATEGORIAS.filter(c => abertasIds.includes(c.id));
+
+  if(categoriasAbertas.length === 0){
+    container.innerHTML = '<div class="empty-state">Seu gerente ainda não abriu os desafios de hoje.<br>Volte a checar mais tarde.</div>';
+    btnEnviar.style.display = 'none';
+    return;
+  }
+
+  container.innerHTML = '';
+  categoriasAbertas.forEach(cat => {
+    const row = document.createElement('div');
+    row.className = 'value-row';
+    row.innerHTML = `
+      <span class="name">${cat.label}</span>
+      <input type="number" inputmode="decimal" min="0" step="any" placeholder="0" data-cat-id="${cat.id}">
+    `;
+    container.appendChild(row);
+  });
+  btnEnviar.style.display = 'block';
+}
+
+async function enviarValoresVendedor(){
+  if(!sessaoVendedor) return;
+  const statusEl = document.getElementById('ven-save-status');
+  const data = hojeISO();
+
+  const inputs = document.querySelectorAll('#ven-lista-container input[data-cat-id]');
+  const valores = {};
+  inputs.forEach(inp => {
+    valores[inp.dataset.catId] = inp.value === '' ? 0 : Number(inp.value);
+  });
+
+  const registro = {
+    vendedorId: sessaoVendedor.vendedorId,
+    gerenteId: sessaoVendedor.gerenteId,
+    operacaoId: sessaoVendedor.operacaoId,
+    data: data,
+    valores: valores,
+    enviadoEm: new Date().toISOString()
+  };
+
+  statusEl.style.color = 'var(--chalk-dim)';
+  statusEl.textContent = 'Enviando...';
+
+  try{
+    await enviarValoresNoBackend(registro);
+    statusEl.textContent = '';
+    mostrarToast('Resultados enviados com sucesso!');
+  }catch(e){
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Erro ao enviar. Tente novamente.';
+  }
+}
+
+
+/* ---------------- Inicialização geral ---------------- */
+inicializarTelaLoginGerente();
+inicializarTelaLoginVendedor();
+
+</script>
+</body>
+</html>
