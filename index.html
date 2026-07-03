@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     /* ---- Identidade visual: Black Piano ---- */
@@ -297,6 +298,82 @@
     text-transform:uppercase;
     color:var(--chalk-dim);
   }
+
+  /* ---------- Acesso gerencial ---------- */
+  .home-admin-bar{
+    display:flex;
+    justify-content:flex-end;
+    margin-bottom:10px;
+  }
+  .admin-btn{
+    background:none;
+    border:1px solid var(--divider);
+    color:var(--chalk-dim);
+    border-radius:8px;
+    padding:7px 12px;
+    font-family:var(--font-body);
+    font-size:12px;
+    cursor:pointer;
+  }
+  .admin-btn:hover{ border-color:var(--amber); color:var(--amber); }
+
+  /* ---------- Abas do painel gerencial ---------- */
+  .tabs{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .tab-btn{
+    background:var(--board-light);
+    border:1px solid var(--divider);
+    color:var(--chalk-dim);
+    border-radius:20px;
+    padding:8px 14px;
+    font-family:var(--font-body);
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .tab-btn.active{ border-color:var(--amber); color:var(--amber); }
+
+  /* ---------- Listas de cadastro (gerencial) ---------- */
+  .adm-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:18px; }
+  .adm-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:var(--board);
+    border:1px solid var(--divider);
+    border-radius:8px;
+    padding:10px 12px;
+  }
+  .adm-row .info{ min-width:0; }
+  .adm-row-nome{ font-size:14px; }
+  .adm-row-pai{ font-size:11.5px; color:var(--chalk-dim); margin-top:2px; }
+  .adm-row .actions{ display:flex; gap:6px; flex-shrink:0; }
+  .mini-btn{
+    background:none;
+    border:1px solid var(--divider);
+    color:var(--chalk-dim);
+    border-radius:6px;
+    padding:6px 10px;
+    font-size:11.5px;
+    cursor:pointer;
+  }
+  .mini-btn:hover{ border-color:var(--amber); color:var(--amber); }
+  .mini-btn.danger:hover{ border-color:var(--danger); color:var(--danger); }
+
+  input[type="file"]{
+    width:100%;
+    background:var(--board);
+    border:1px dashed var(--divider);
+    color:var(--chalk-dim);
+    border-radius:8px;
+    padding:14px 12px;
+    font-family:var(--font-body);
+    font-size:13px;
+  }
 </style>
 </head>
 <body>
@@ -307,16 +384,19 @@
   <!-- TELA: HOME                                                     -->
   <!-- ============================================================= -->
   <div class="screen active" id="screen-home">
+    <div class="home-admin-bar">
+      <button class="admin-btn" onclick="abrirGerencial()">⚙ Gerencial</button>
+    </div>
     <div class="home-title">Desafios <span style="color:var(--amber)">Diário</span></div>
     <div class="home-sub">Selecione como deseja entrar</div>
     <div class="role-grid">
       <div class="role-card" onclick="irPara('screen-gerente-login')">
         <span class="icon">📋</span>
-        <div class="label">Sou Gerente</div>
+        <div class="label">Sou GV</div>
       </div>
       <div class="role-card" onclick="irPara('screen-vendedor-login')">
         <span class="icon">🎯</span>
-        <div class="label">Sou Vendedor</div>
+        <div class="label">Sou RN</div>
       </div>
     </div>
   </div>
@@ -326,7 +406,7 @@
   <!-- ============================================================= -->
   <div class="screen" id="screen-gerente-login">
     <div class="top-bar">
-      <div class="brand">Área do <span>Gerente</span></div>
+      <div class="brand">Área do <span>GV</span></div>
       <button class="back-btn" onclick="irPara('screen-home')">← Voltar</button>
     </div>
 
@@ -335,7 +415,7 @@
       <label for="ger-operacao">Operação</label>
       <select id="ger-operacao" onchange="popularGerentesDoLogin()"></select>
 
-      <label for="ger-select">Gerente</label>
+      <label for="ger-select">GV (Gerente de Vendas)</label>
       <select id="ger-select"></select>
 
       <label for="ger-pin">PIN</label>
@@ -351,7 +431,7 @@
   <!-- ============================================================= -->
   <div class="screen" id="screen-gerente-dashboard">
     <div class="top-bar">
-      <div class="brand">Painel do <span>Gerente</span></div>
+      <div class="brand">Painel do <span>GV</span></div>
       <button class="back-btn" onclick="logoutGerente()">Sair</button>
     </div>
 
@@ -377,7 +457,7 @@
   <!-- ============================================================= -->
   <div class="screen" id="screen-vendedor-login">
     <div class="top-bar">
-      <div class="brand">Área do <span>Vendedor</span></div>
+      <div class="brand">Área do <span>RN</span></div>
       <button class="back-btn" onclick="irPara('screen-home')">← Voltar</button>
     </div>
 
@@ -386,10 +466,10 @@
       <label for="ven-operacao">Operação</label>
       <select id="ven-operacao" onchange="popularGerentesDoVendedorLogin()"></select>
 
-      <label for="ven-gerente">Gerente</label>
+      <label for="ven-gerente">GV (Gerente de Vendas)</label>
       <select id="ven-gerente" onchange="popularVendedoresDoLogin()"></select>
 
-      <label for="ven-select">Seu nome</label>
+      <label for="ven-select">Seu nome (RN)</label>
       <select id="ven-select"></select>
 
       <div class="error-msg" id="ven-login-erro"></div>
@@ -416,6 +496,72 @@
     </div>
   </div>
 
+  <!-- ============================================================= -->
+  <!-- TELA: LOGIN GERENCIAL                                          -->
+  <!-- ============================================================= -->
+  <div class="screen" id="screen-gerencial-login">
+    <div class="top-bar">
+      <div class="brand">Área <span>Gerencial</span></div>
+      <button class="back-btn" onclick="irPara('screen-home')">← Voltar</button>
+    </div>
+
+    <div class="panel">
+      <h2>Acesso restrito</h2>
+      <label for="ger-cial-pin">Senha</label>
+      <input type="password" id="ger-cial-pin" inputmode="numeric" placeholder="••••">
+      <div class="error-msg" id="ger-cial-erro"></div>
+      <button class="primary-btn" onclick="loginGerencial()">Entrar</button>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- TELA: PAINEL GERENCIAL (cadastro e importação)                 -->
+  <!-- ============================================================= -->
+  <div class="screen" id="screen-gerencial-dashboard">
+    <div class="top-bar">
+      <div class="brand">Painel <span>Gerencial</span></div>
+      <button class="back-btn" onclick="logoutGerencial()">Sair</button>
+    </div>
+
+    <div class="panel">
+      <h2>Importar planilha</h2>
+      <div class="hint">
+        A planilha deve conter as colunas: <strong>Operacao Nome</strong>, <strong>Operacao</strong> (código),
+        <strong>GERENTE COMERCIAL</strong>, <strong>GV</strong> (código), <strong>GV - NOME</strong>,
+        <strong>Setor</strong> (código do RN). Colunas de código são opcionais quando não existirem.<br><br>
+        <strong>Atenção:</strong> importar substitui todo o cadastro atual.
+      </div>
+      <input type="file" id="adm-import-arquivo" accept=".xlsx,.xls,.csv" onchange="processarArquivoImportacao(event)">
+    </div>
+
+    <div class="panel">
+      <h2>Cadastro manual</h2>
+      <div class="tabs">
+        <button class="tab-btn" id="adm-tab-gc" onclick="mostrarAbaGerencial('gc')">Gerentes Comerciais</button>
+        <button class="tab-btn" id="adm-tab-operacao" onclick="mostrarAbaGerencial('operacao')">Operações</button>
+        <button class="tab-btn" id="adm-tab-gv" onclick="mostrarAbaGerencial('gv')">GVs</button>
+        <button class="tab-btn" id="adm-tab-rn" onclick="mostrarAbaGerencial('rn')">RNs</button>
+      </div>
+
+      <div id="adm-painel-gc" class="adm-painel">
+        <div class="adm-list" id="adm-lista-gc"></div>
+        <div id="adm-form-gc"></div>
+      </div>
+      <div id="adm-painel-operacao" class="adm-painel" style="display:none;">
+        <div class="adm-list" id="adm-lista-operacao"></div>
+        <div id="adm-form-operacao"></div>
+      </div>
+      <div id="adm-painel-gv" class="adm-painel" style="display:none;">
+        <div class="adm-list" id="adm-lista-gv"></div>
+        <div id="adm-form-gv"></div>
+      </div>
+      <div id="adm-painel-rn" class="adm-painel" style="display:none;">
+        <div class="adm-list" id="adm-lista-rn"></div>
+        <div id="adm-form-rn"></div>
+      </div>
+    </div>
+  </div>
+
   <footer class="app-footer">
     <img src="assets/logo-virginia-branco.png" alt="Virginia">
     <span class="footer-text">Created by Power Sales Team</span>
@@ -431,16 +577,18 @@
    ================================================================
    Nenhuma outra parte do código precisa ser tocada para:
    - adicionar/remover uma categoria de desafio
-   - adicionar/remover uma operação, gerente ou vendedor
+   - trocar a senha de acesso ao Painel Gerencial
 
-   HIERARQUIA DE CHAVES (IDs):
-     OPERACAO  (id próprio)
-       -> GERENTE   (guarda operacaoId apontando pra sua operação)
-            -> VENDEDOR (guarda gerenteId apontando pro seu gerente)
+   A hierarquia de OPERAÇÃO / GERENTE COMERCIAL / GV / RN não é mais
+   fixa aqui no código: ela é cadastrada pela própria tela "Gerencial"
+   (importando planilha ou cadastrando manualmente) e fica guardada
+   em `organizacao` (ver mais abaixo).
 
-   Use IDs curtos e sem espaço (ex: 'OP01', 'GER03', 'VEN014').
-   Esses IDs são o que efetivamente vai ser salvo nas linhas da
-   planilha do Google Sheets — os nomes são só pra exibição.
+   HIERARQUIA:
+     GERENTE COMERCIAL
+       -> OPERAÇÃO (guarda gerenteComercialId)
+            -> GV - Gerente de Vendas (guarda operacaoId)
+                 -> RN - vendedor (guarda gvId)
 ================================================================ */
 
 const CATEGORIAS = [
@@ -459,28 +607,90 @@ const CATEGORIAS = [
   // { id: 'NOVA_CATEGORIA', label: 'Nome que aparece na tela' },
 ];
 
-const OPERACOES = [
-  { id: 'OP01', nome: 'Operação Curitiba' },
-  { id: 'OP02', nome: 'Operação Litoral' },
-  // { id: 'OP03', nome: 'Nova Operação' },
-];
-
-const GERENTES = [
-  { id: 'GER01', nome: 'João Silva',   operacaoId: 'OP01', pin: '1234' },
-  { id: 'GER02', nome: 'Marcos Lima',  operacaoId: 'OP02', pin: '1234' },
-  // { id: 'GER03', nome: 'Nome do Gerente', operacaoId: 'OP01', pin: '0000' },
-];
-
-const VENDEDORES = [
-  { id: 'VEN01', nome: 'Maria Souza',   gerenteId: 'GER01' },
-  { id: 'VEN02', nome: 'Pedro Torres',  gerenteId: 'GER01' },
-  { id: 'VEN03', nome: 'Ana Ferreira',  gerenteId: 'GER02' },
-  // { id: 'VEN04', nome: 'Nome do Vendedor', gerenteId: 'GER01' },
-];
+// Senha para acessar o Painel Gerencial (botão "⚙ Gerencial" na Home)
+const SENHA_GERENCIAL = '2026';
 
 /* ================================================================
    FIM DA CONFIGURAÇÃO
 ================================================================ */
+
+
+/* =====================================================================
+   ORGANIZAÇÃO (Gerente Comercial / Operação / GV / RN)
+   — cadastrada via importação de planilha ou pela tela Gerencial —
+===================================================================== */
+
+// Descreve os 4 níveis da hierarquia de forma genérica, para que o
+// Painel Gerencial consiga desenhar listas e formulários de cadastro
+// automaticamente para cada um deles.
+const NIVEIS = {
+  gc: {
+    arrayKey: 'gerentesComerciais',
+    label: 'Gerente Comercial',
+    campos: [{ key: 'nome', label: 'Nome do Gerente Comercial', obrigatorio: true }],
+    pai: null
+  },
+  operacao: {
+    arrayKey: 'operacoes',
+    label: 'Operação',
+    campos: [
+      { key: 'nome', label: 'Nome da Operação', obrigatorio: true },
+      { key: 'codigo', label: 'Código (opcional)', obrigatorio: false }
+    ],
+    pai: { nivel: 'gc', campo: 'gerenteComercialId', label: 'Gerente Comercial' }
+  },
+  gv: {
+    arrayKey: 'gvs',
+    label: 'GV (Gerente de Vendas)',
+    campos: [
+      { key: 'nome', label: 'Nome do GV', obrigatorio: true },
+      { key: 'codigo', label: 'Código (opcional)', obrigatorio: false },
+      { key: 'pin', label: 'PIN de acesso (opcional, padrão 1234)', obrigatorio: false }
+    ],
+    pai: { nivel: 'operacao', campo: 'operacaoId', label: 'Operação' }
+  },
+  rn: {
+    arrayKey: 'rns',
+    label: 'RN (vendedor)',
+    campos: [
+      { key: 'nome', label: 'Nome do RN (opcional)', obrigatorio: false },
+      { key: 'codigo', label: 'Código / Setor (opcional)', obrigatorio: false }
+    ],
+    pai: { nivel: 'gv', campo: 'gvId', label: 'GV' }
+  }
+};
+
+function obterOrganizacaoVazia(){
+  return { gerentesComerciais: [], operacoes: [], gvs: [], rns: [] };
+}
+
+function gerarId(prefixo){
+  return `${prefixo}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,7)}`;
+}
+
+function obterArray(nivel){
+  return organizacao[NIVEIS[nivel].arrayKey];
+}
+
+function nomeExibicaoRN(rn){
+  if(rn.nome && rn.nome.trim()) return rn.nome.trim();
+  return rn.codigo ? `RN ${rn.codigo}` : 'RN sem nome';
+}
+
+/* ---------------- Persistência da organização (localStorage por enquanto) ---------------- */
+
+function carregarOrganizacaoDoBackend(){
+  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL + '?tipo=organizacao')
+  const bruto = localStorage.getItem('organizacao_cadastro');
+  return bruto ? JSON.parse(bruto) : obterOrganizacaoVazia();
+}
+
+function salvarOrganizacaoNoBackend(org){
+  // TODO (próxima etapa): substituir por fetch(APPS_SCRIPT_URL, {method:'POST', body: JSON.stringify({tipo:'organizacao', dados:org})})
+  localStorage.setItem('organizacao_cadastro', JSON.stringify(org));
+}
+
+let organizacao = carregarOrganizacaoDoBackend();
 
 
 /* ---------------- Estado em memória da sessão atual ---------------- */
@@ -562,13 +772,13 @@ function preencherSelect(select, itens, campoValor, campoTexto, placeholder){
 
 function inicializarTelaLoginGerente(){
   const selOp = document.getElementById('ger-operacao');
-  preencherSelect(selOp, OPERACOES, 'id', 'nome', null);
+  preencherSelect(selOp, organizacao.operacoes, 'id', 'nome', null);
   popularGerentesDoLogin();
 }
 
 function popularGerentesDoLogin(){
   const opId = document.getElementById('ger-operacao').value;
-  const lista = GERENTES.filter(g => g.operacaoId === opId);
+  const lista = organizacao.gvs.filter(g => g.operacaoId === opId);
   preencherSelect(document.getElementById('ger-select'), lista, 'id', 'nome', null);
 }
 
@@ -578,12 +788,12 @@ function loginGerente(){
   const erroEl = document.getElementById('ger-login-erro');
   erroEl.textContent = '';
 
-  const gerente = GERENTES.find(g => g.id === gerenteId);
+  const gerente = organizacao.gvs.find(g => g.id === gerenteId);
   if(!gerente){
-    erroEl.textContent = 'Selecione um gerente válido.';
+    erroEl.textContent = 'Selecione um GV válido.';
     return;
   }
-  if(pin !== gerente.pin){
+  if(pin !== (gerente.pin || '1234')){
     erroEl.textContent = 'PIN incorreto.';
     return;
   }
@@ -673,45 +883,47 @@ function formatarDataBR(iso){
 
 function inicializarTelaLoginVendedor(){
   const selOp = document.getElementById('ven-operacao');
-  preencherSelect(selOp, OPERACOES, 'id', 'nome', null);
+  preencherSelect(selOp, organizacao.operacoes, 'id', 'nome', null);
   popularGerentesDoVendedorLogin();
 }
 
 function popularGerentesDoVendedorLogin(){
   const opId = document.getElementById('ven-operacao').value;
-  const lista = GERENTES.filter(g => g.operacaoId === opId);
+  const lista = organizacao.gvs.filter(g => g.operacaoId === opId);
   preencherSelect(document.getElementById('ven-gerente'), lista, 'id', 'nome', null);
   popularVendedoresDoLogin();
 }
 
 function popularVendedoresDoLogin(){
-  const gerenteId = document.getElementById('ven-gerente').value;
-  const lista = VENDEDORES.filter(v => v.gerenteId === gerenteId);
-  preencherSelect(document.getElementById('ven-select'), lista, 'id', 'nome', null);
+  const gvId = document.getElementById('ven-gerente').value;
+  const lista = organizacao.rns
+    .filter(r => r.gvId === gvId)
+    .map(r => ({ id: r.id, nomeExibicao: nomeExibicaoRN(r) }));
+  preencherSelect(document.getElementById('ven-select'), lista, 'id', 'nomeExibicao', null);
 }
 
 async function loginVendedor(){
   const vendedorId = document.getElementById('ven-select').value;
-  const gerenteId = document.getElementById('ven-gerente').value;
+  const gvId = document.getElementById('ven-gerente').value;
   const erroEl = document.getElementById('ven-login-erro');
   erroEl.textContent = '';
 
-  const vendedor = VENDEDORES.find(v => v.id === vendedorId);
-  const gerente = GERENTES.find(g => g.id === gerenteId);
+  const rn = organizacao.rns.find(r => r.id === vendedorId);
+  const gv = organizacao.gvs.find(g => g.id === gvId);
 
-  if(!vendedor || !gerente){
-    erroEl.textContent = 'Selecione seu gerente e seu nome.';
+  if(!rn || !gv){
+    erroEl.textContent = 'Selecione seu GV e seu nome.';
     return;
   }
 
   sessaoVendedor = {
-    vendedorId: vendedor.id,
-    nome: vendedor.nome,
-    gerenteId: gerente.id,
-    operacaoId: gerente.operacaoId
+    vendedorId: rn.id,
+    nome: nomeExibicaoRN(rn),
+    gerenteId: gv.id,
+    operacaoId: gv.operacaoId
   };
 
-  document.getElementById('ven-dashboard-nome').textContent = `${vendedor.nome} · time de ${gerente.nome}`;
+  document.getElementById('ven-dashboard-nome').textContent = `${sessaoVendedor.nome} · time de ${gv.nome}`;
   await carregarDesafiosDoVendedor();
   irPara('screen-vendedor-desafios');
 }
@@ -786,6 +998,290 @@ async function enviarValoresVendedor(){
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = 'Erro ao enviar. Tente novamente.';
   }
+}
+
+
+/* =====================================================================
+   PAINEL GERENCIAL — acesso, abas e navegação
+===================================================================== */
+
+function abrirGerencial(){
+  document.getElementById('ger-cial-pin').value = '';
+  document.getElementById('ger-cial-erro').textContent = '';
+  irPara('screen-gerencial-login');
+}
+
+function loginGerencial(){
+  const pin = document.getElementById('ger-cial-pin').value.trim();
+  const erroEl = document.getElementById('ger-cial-erro');
+  if(pin !== SENHA_GERENCIAL){
+    erroEl.textContent = 'Senha incorreta.';
+    return;
+  }
+  erroEl.textContent = '';
+  irPara('screen-gerencial-dashboard');
+  mostrarAbaGerencial('gc');
+}
+
+function logoutGerencial(){
+  irPara('screen-home');
+}
+
+function mostrarAbaGerencial(nivel){
+  Object.keys(NIVEIS).forEach(k => {
+    document.getElementById(`adm-tab-${k}`).classList.toggle('active', k === nivel);
+    document.getElementById(`adm-painel-${k}`).style.display = (k === nivel) ? 'block' : 'none';
+  });
+  renderNivel(nivel);
+}
+
+/* ---------------- Renderização genérica de lista + formulário ---------------- */
+
+function nomeDoPai(nivel, item){
+  const cfg = NIVEIS[nivel];
+  if(!cfg.pai) return '';
+  const pai = obterArray(cfg.pai.nivel).find(p => p.id === item[cfg.pai.campo]);
+  return pai ? `${cfg.pai.label}: ${pai.nome}` : '';
+}
+
+function renderNivel(nivel){
+  const cfg = NIVEIS[nivel];
+  const listaEl = document.getElementById(`adm-lista-${nivel}`);
+  const itens = obterArray(nivel);
+
+  if(itens.length === 0){
+    listaEl.innerHTML = '<div class="empty-state">Nenhum registro cadastrado ainda.</div>';
+  }else{
+    listaEl.innerHTML = itens.map(item => {
+      const codigoTxt = item.codigo ? ` · Cód. ${item.codigo}` : '';
+      const nomeTxt = (item.nome && item.nome.trim()) ? item.nome : (nivel === 'rn' ? nomeExibicaoRN(item) : '(sem nome)');
+      const paiTxt = nomeDoPai(nivel, item);
+      return `
+        <div class="adm-row">
+          <div class="info">
+            <div class="adm-row-nome">${nomeTxt}${codigoTxt}</div>
+            ${paiTxt ? `<div class="adm-row-pai">${paiTxt}</div>` : ''}
+          </div>
+          <div class="actions">
+            <button class="mini-btn" onclick="editarItemNivel('${nivel}','${item.id}')">Editar</button>
+            <button class="mini-btn danger" onclick="excluirItemNivel('${nivel}','${item.id}')">Excluir</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  renderFormNivel(nivel);
+}
+
+function renderFormNivel(nivel){
+  const cfg = NIVEIS[nivel];
+  const formEl = document.getElementById(`adm-form-${nivel}`);
+
+  const camposHtml = cfg.campos.map(c => `
+    <label>${c.label}</label>
+    <input type="text" id="adm-campo-${nivel}-${c.key}" placeholder="${c.label}">
+  `).join('');
+
+  let paiHtml = '';
+  if(cfg.pai){
+    const opcoes = obterArray(cfg.pai.nivel);
+    paiHtml = `
+      <label>${cfg.pai.label}</label>
+      <select id="adm-campo-${nivel}-${cfg.pai.campo}">
+        <option value="">Selecione...</option>
+        ${opcoes.map(o => `<option value="${o.id}">${o.nome}</option>`).join('')}
+      </select>
+    `;
+  }
+
+  formEl.innerHTML = `
+    ${camposHtml}
+    ${paiHtml}
+    <input type="hidden" id="adm-editando-${nivel}" value="">
+    <button class="primary-btn" onclick="salvarItemNivel('${nivel}')">Cadastrar</button>
+    <button class="back-btn" id="adm-cancelar-${nivel}" style="display:none; margin-top:8px; width:100%;" onclick="cancelarEdicaoNivel('${nivel}')">Cancelar edição</button>
+  `;
+}
+
+function salvarItemNivel(nivel){
+  const cfg = NIVEIS[nivel];
+  const valores = {};
+
+  for(const c of cfg.campos){
+    const valor = document.getElementById(`adm-campo-${nivel}-${c.key}`).value.trim();
+    if(c.obrigatorio && !valor){
+      mostrarToast(`Preencha: ${c.label}`);
+      return;
+    }
+    valores[c.key] = valor;
+  }
+
+  if(cfg.pai){
+    const paiId = document.getElementById(`adm-campo-${nivel}-${cfg.pai.campo}`).value;
+    if(!paiId){
+      mostrarToast(`Selecione: ${cfg.pai.label}`);
+      return;
+    }
+    valores[cfg.pai.campo] = paiId;
+  }
+
+  const editandoId = document.getElementById(`adm-editando-${nivel}`).value;
+  const arr = obterArray(nivel);
+
+  if(editandoId){
+    Object.assign(arr.find(i => i.id === editandoId), valores);
+  }else{
+    valores.id = gerarId(nivel);
+    if(nivel === 'gv' && !valores.pin) valores.pin = '1234';
+    arr.push(valores);
+  }
+
+  salvarOrganizacaoNoBackend(organizacao);
+  renderNivel(nivel);
+  atualizarSelectsDeLogin();
+  mostrarToast('Salvo com sucesso.');
+}
+
+function editarItemNivel(nivel, id){
+  const cfg = NIVEIS[nivel];
+  const item = obterArray(nivel).find(i => i.id === id);
+  if(!item) return;
+
+  cfg.campos.forEach(c => {
+    document.getElementById(`adm-campo-${nivel}-${c.key}`).value = item[c.key] || '';
+  });
+  if(cfg.pai){
+    document.getElementById(`adm-campo-${nivel}-${cfg.pai.campo}`).value = item[cfg.pai.campo] || '';
+  }
+
+  document.getElementById(`adm-editando-${nivel}`).value = id;
+  document.getElementById(`adm-cancelar-${nivel}`).style.display = 'block';
+  document.querySelector(`#adm-form-${nivel} .primary-btn`).textContent = 'Salvar edição';
+  document.getElementById(`adm-form-${nivel}`).scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelarEdicaoNivel(nivel){
+  renderFormNivel(nivel);
+}
+
+function excluirItemNivel(nivel, id){
+  if(!confirm('Excluir este registro? Registros vinculados abaixo dele (se houver) também serão excluídos. Essa ação não pode ser desfeita.')) return;
+  excluirRecursivo(nivel, id);
+  salvarOrganizacaoNoBackend(organizacao);
+  renderNivel(nivel);
+  atualizarSelectsDeLogin();
+}
+
+function excluirRecursivo(nivel, id){
+  const nivelFilho = Object.keys(NIVEIS).find(k => NIVEIS[k].pai && NIVEIS[k].pai.nivel === nivel);
+  if(nivelFilho){
+    obterArray(nivelFilho)
+      .filter(item => item[NIVEIS[nivelFilho].pai.campo] === id)
+      .forEach(filho => excluirRecursivo(nivelFilho, filho.id));
+  }
+  const arr = obterArray(nivel);
+  const idx = arr.findIndex(i => i.id === id);
+  if(idx > -1) arr.splice(idx, 1);
+}
+
+function atualizarSelectsDeLogin(){
+  inicializarTelaLoginGerente();
+  inicializarTelaLoginVendedor();
+}
+
+/* ---------------- Importação de planilha (Operação / Gerente Comercial / GV / RN) ---------------- */
+
+function normalizarCabecalho(str){
+  return String(str).trim().toUpperCase();
+}
+
+function processarArquivoImportacao(event){
+  const arquivo = event.target.files[0];
+  if(!arquivo) return;
+
+  const leitor = new FileReader();
+  leitor.onload = function(e){
+    try{
+      const dados = new Uint8Array(e.target.result);
+      const wb = XLSX.read(dados, { type: 'array' });
+      const primeiraAba = wb.Sheets[wb.SheetNames[0]];
+      const linhas = XLSX.utils.sheet_to_json(primeiraAba, { defval: '' });
+      importarLinhasParaOrganizacao(linhas);
+    }catch(err){
+      mostrarToast('Não consegui ler esse arquivo. Confira se ele segue o modelo.');
+    }
+  };
+  leitor.readAsArrayBuffer(arquivo);
+  event.target.value = '';
+}
+
+function importarLinhasParaOrganizacao(linhas){
+  if(linhas.length === 0){
+    mostrarToast('A planilha está vazia.');
+    return;
+  }
+  if(!confirm(`Isso vai SUBSTITUIR todo o cadastro atual pelos dados da planilha (${linhas.length} linha(s)). Continuar?`)) return;
+
+  const nova = obterOrganizacaoVazia();
+  const mapaGC = new Map();
+  const mapaOP = new Map();
+  const mapaGV = new Map();
+  const mapaRN = new Map();
+
+  linhas.forEach(linha => {
+    const chaves = {};
+    Object.keys(linha).forEach(k => chaves[normalizarCabecalho(k)] = linha[k]);
+
+    const opNome = String(chaves['OPERACAO NOME'] || chaves['OPERAÇÃO NOME'] || '').trim();
+    const opCodigo = String(chaves['OPERACAO'] || chaves['OPERAÇÃO'] || '').trim();
+    const gcNome = String(chaves['GERENTE COMERCIAL'] || '').trim();
+    const gvCodigo = String(chaves['GV'] || '').trim();
+    const gvNome = String(chaves['GV - NOME'] || chaves['GV NOME'] || '').trim();
+    const rnCodigo = String(chaves['SETOR'] || chaves['RN'] || '').trim();
+    const rnNome = String(chaves['RN - NOME'] || chaves['RN NOME'] || '').trim();
+
+    if(!opNome || !gcNome) return;
+
+    let gc = mapaGC.get(gcNome);
+    if(!gc){
+      gc = { id: gerarId('gc'), nome: gcNome };
+      mapaGC.set(gcNome, gc);
+      nova.gerentesComerciais.push(gc);
+    }
+
+    const chaveOp = opCodigo ? `COD_${opCodigo}` : opNome;
+    let op = mapaOP.get(chaveOp);
+    if(!op){
+      op = { id: gerarId('op'), nome: opNome, codigo: opCodigo, gerenteComercialId: gc.id };
+      mapaOP.set(chaveOp, op);
+      nova.operacoes.push(op);
+    }
+
+    if(gvCodigo || gvNome){
+      const chaveGv = `${op.id}_${gvCodigo || gvNome}`;
+      let gv = mapaGV.get(chaveGv);
+      if(!gv){
+        gv = { id: gerarId('gv'), nome: gvNome || `GV ${gvCodigo}`, codigo: gvCodigo, operacaoId: op.id, pin: '1234' };
+        mapaGV.set(chaveGv, gv);
+        nova.gvs.push(gv);
+      }
+
+      if(rnCodigo || rnNome){
+        const chaveRn = `${gv.id}_${rnCodigo || rnNome}`;
+        if(!mapaRN.has(chaveRn)){
+          const rn = { id: gerarId('rn'), nome: rnNome, codigo: rnCodigo, gvId: gv.id };
+          mapaRN.set(chaveRn, rn);
+          nova.rns.push(rn);
+        }
+      }
+    }
+  });
+
+  organizacao = nova;
+  salvarOrganizacaoNoBackend(organizacao);
+  renderNivel(document.querySelector('.tab-btn.active') ? Object.keys(NIVEIS).find(k => document.getElementById(`adm-tab-${k}`).classList.contains('active')) : 'gc');
+  atualizarSelectsDeLogin();
+  mostrarToast(`Importado: ${nova.gerentesComerciais.length} gerente(s) comercial(is), ${nova.operacoes.length} operação(ões), ${nova.gvs.length} GV(s), ${nova.rns.length} RN(s).`);
 }
 
 
