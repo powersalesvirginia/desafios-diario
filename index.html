@@ -250,17 +250,57 @@
   .cat-toggle.on .switch::after{ left:18px; }
 
   /* ---------- Inputs de valores (tela vendedor) ---------- */
-  .value-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    padding:12px 0;
-    border-bottom:1px solid var(--divider);
+  /* ---------- Linha de desafio do RN (tela vendedor) ---------- */
+  .desafio-card{
+    background:var(--board-lighter);
+    border:1px solid var(--divider);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:12px;
   }
-  .value-row:last-child{ border-bottom:none; }
-  .value-row .name{ font-size:14px; flex:1; }
-  .value-row input{ width:110px; text-align:right; }
+  .desafio-card .cat-nome{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+    color:var(--chalk);
+    margin-bottom:12px;
+  }
+  .desafio-campos{
+    display:grid;
+    grid-template-columns:1fr 1fr auto;
+    gap:10px;
+    align-items:end;
+  }
+  .desafio-campos .campo label{
+    margin:0 0 5px 0;
+    font-size:10.5px;
+  }
+  .desafio-campos .campo input{
+    padding:9px 10px;
+    text-align:right;
+    font-size:15px;
+  }
+  .desafio-campos .pct{
+    min-width:66px;
+    text-align:center;
+    padding-bottom:2px;
+  }
+  .desafio-campos .pct .pct-label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    color:var(--chalk-dim);
+    margin-bottom:5px;
+  }
+  .desafio-campos .pct .pct-valor{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:19px;
+    color:var(--amber);
+    line-height:1.4;
+  }
 
   .empty-state{
     text-align:center;
@@ -613,9 +653,9 @@
     <div class="badge" id="ven-dashboard-nome">—</div>
 
     <div class="panel">
-      <h2 id="ven-data-titulo">Desafios de hoje</h2>
+      <h2 id="ven-data-titulo">Desafio</h2>
       <div id="ven-lista-container"></div>
-      <button class="primary-btn" id="ven-enviar-btn" onclick="enviarValoresVendedor()" style="display:none;">Enviar resultados</button>
+      <button class="primary-btn" id="ven-enviar-btn" onclick="enviarValoresVendedor()" style="display:none;">Salvar</button>
       <div class="error-msg" id="ven-save-status"></div>
     </div>
   </div>
@@ -763,6 +803,20 @@
         <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="senha-gv-filtro" placeholder="Filtrar por nome, código ou operação..." oninput="renderSenhasGVs()"></div>
         <div class="adm-count" id="senha-gv-count"></div>
         <div class="adm-list" id="senha-gv-lista"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- POP-UP PÓS-SALVAR (RN)                                         -->
+  <!-- ============================================================= -->
+  <div class="modal-overlay" id="modal-pos-salvar">
+    <div class="modal-box">
+      <h2 id="modal-titulo-pos">Resultados salvos!</h2>
+      <div class="hint" style="margin-bottom:0;">O que você deseja fazer agora?</div>
+      <div class="modal-actions">
+        <button class="back-btn" onclick="popupSalvarSair()">Sair</button>
+        <button class="primary-btn" onclick="popupSalvarContinuar()">Continuar editando</button>
       </div>
     </div>
   </div>
@@ -1373,7 +1427,7 @@ function logoutVendedor(){
 async function carregarDesafiosDoVendedor(){
   if(!sessaoVendedor) return;
   const data = hojeISO();
-  document.getElementById('ven-data-titulo').textContent = `Desafios de ${formatarDataBR(data)}`;
+  document.getElementById('ven-data-titulo').textContent = `Desafio · ${formatarDataBR(data)}`;
 
   const container = document.getElementById('ven-lista-container');
   const btnEnviar = document.getElementById('ven-enviar-btn');
@@ -1393,15 +1447,50 @@ async function carregarDesafiosDoVendedor(){
 
   container.innerHTML = '';
   categoriasAbertas.forEach(cat => {
-    const row = document.createElement('div');
-    row.className = 'value-row';
-    row.innerHTML = `
-      <span class="name">${cat.label}</span>
-      <input type="number" inputmode="decimal" min="0" step="any" placeholder="0" data-cat-id="${cat.id}">
+    const card = document.createElement('div');
+    card.className = 'desafio-card';
+    card.innerHTML = `
+      <div class="cat-nome">${cat.label}</div>
+      <div class="desafio-campos">
+        <div class="campo">
+          <label>Desafio (meta)</label>
+          <input type="number" inputmode="decimal" min="0" step="any" placeholder="0"
+                 data-cat-id="${cat.id}" data-tipo="desafio" oninput="recalcularPct('${cat.id}')">
+        </div>
+        <div class="campo">
+          <label>Realizado</label>
+          <input type="number" inputmode="decimal" min="0" step="any" placeholder="0"
+                 data-cat-id="${cat.id}" data-tipo="realizado" oninput="recalcularPct('${cat.id}')">
+        </div>
+        <div class="pct">
+          <div class="pct-label">Ating.</div>
+          <div class="pct-valor" id="pct-${cat.id}">—</div>
+        </div>
+      </div>
     `;
-    container.appendChild(row);
+    container.appendChild(card);
   });
   btnEnviar.style.display = 'block';
+}
+
+// Calcula o atingimento (Realizado ÷ Desafio × 100) de uma categoria.
+function recalcularPct(catId){
+  const desafioEl = document.querySelector(`input[data-cat-id="${catId}"][data-tipo="desafio"]`);
+  const realizadoEl = document.querySelector(`input[data-cat-id="${catId}"][data-tipo="realizado"]`);
+  const pctEl = document.getElementById(`pct-${catId}`);
+
+  const meta = parseFloat(desafioEl.value);
+  const real = parseFloat(realizadoEl.value);
+
+  if(!isNaN(meta) && meta > 0 && !isNaN(real)){
+    const pct = (real / meta) * 100;
+    pctEl.textContent = `${pct.toFixed(0)}%`;
+    // Verde quando bate/ultrapassa a meta, dourado abaixo.
+    pctEl.style.color = pct >= 100 ? 'var(--success)' : 'var(--amber)';
+  }else{
+    pctEl.textContent = '—';
+    pctEl.style.color = 'var(--amber)';
+  }
 }
 
 async function enviarValoresVendedor(){
@@ -1409,10 +1498,16 @@ async function enviarValoresVendedor(){
   const statusEl = document.getElementById('ven-save-status');
   const data = hojeISO();
 
-  const inputs = document.querySelectorAll('#ven-lista-container input[data-cat-id]');
+  // Coleta, por categoria, o desafio (meta), o realizado e o % de atingimento.
   const valores = {};
-  inputs.forEach(inp => {
-    valores[inp.dataset.catId] = inp.value === '' ? 0 : Number(inp.value);
+  document.querySelectorAll('#ven-lista-container .desafio-card').forEach(card => {
+    const desafioEl = card.querySelector('input[data-tipo="desafio"]');
+    const realizadoEl = card.querySelector('input[data-tipo="realizado"]');
+    const catId = desafioEl.dataset.catId;
+    const meta = desafioEl.value === '' ? 0 : Number(desafioEl.value);
+    const real = realizadoEl.value === '' ? 0 : Number(realizadoEl.value);
+    const pct = meta > 0 ? Number(((real / meta) * 100).toFixed(1)) : 0;
+    valores[catId] = { desafio: meta, realizado: real, atingimento: pct };
   });
 
   const registro = {
@@ -1425,16 +1520,35 @@ async function enviarValoresVendedor(){
   };
 
   statusEl.style.color = 'var(--chalk-dim)';
-  statusEl.textContent = 'Enviando...';
+  statusEl.textContent = 'Salvando...';
 
   try{
     await enviarValoresNoBackend(registro);
     statusEl.textContent = '';
-    mostrarToast('Resultados enviados com sucesso!');
+    abrirPopupPosSalvar();
   }catch(e){
     statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = 'Erro ao enviar. Tente novamente.';
+    statusEl.textContent = 'Erro ao salvar. Tente novamente.';
   }
+}
+
+// Pop-up após salvar: opção de sair ou continuar editando.
+function abrirPopupPosSalvar(){
+  document.getElementById('modal-titulo-pos').textContent = 'Resultados salvos!';
+  document.getElementById('modal-pos-salvar').classList.add('active');
+}
+
+function fecharPopupPosSalvar(){
+  document.getElementById('modal-pos-salvar').classList.remove('active');
+}
+
+function popupSalvarSair(){
+  fecharPopupPosSalvar();
+  logoutVendedor();
+}
+
+function popupSalvarContinuar(){
+  fecharPopupPosSalvar();
 }
 
 
