@@ -417,6 +417,50 @@
     margin-bottom:10px;
   }
 
+  /* ---------- Sub-abas do painel gerencial ---------- */
+  .subtabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+    background:var(--board-lighter);
+    padding:5px;
+    border-radius:10px;
+    border:1px solid var(--divider);
+  }
+  .subtab-btn{
+    flex:1;
+    background:none;
+    border:none;
+    color:var(--chalk-dim);
+    border-radius:7px;
+    padding:10px 8px;
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:12.5px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    cursor:pointer;
+  }
+  .subtab-btn.active{
+    background:var(--pill-bg);
+    color:var(--amber);
+  }
+
+  .status-tag{
+    display:inline-block;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    padding:2px 8px;
+    border-radius:20px;
+    margin-left:6px;
+    vertical-align:middle;
+  }
+  .status-tag.inativa{
+    background:rgba(192,72,60,0.12);
+    color:var(--danger);
+  }
+
   /* ---------- Modal de edição ---------- */
   .modal-overlay{
     position:fixed;
@@ -606,54 +650,84 @@
       <button class="back-btn" onclick="logoutGerencial()">Sair</button>
     </div>
 
-    <div class="panel">
-      <h2>Importar / Exportar Excel</h2>
-      <div class="hint">
-        Colunas reconhecidas: <strong>Operacao Nome</strong>, <strong>Operacao</strong> (código),
-        <strong>GERENTE COMERCIAL</strong>, <strong>GV</strong> (código), <strong>GV - NOME</strong>,
-        <strong>Setor</strong> (código do RN), <strong>RN - NOME</strong> (opcional).<br><br>
-        Ao importar, cada linha é identificada pelo código do <strong>Setor</strong>: se o Setor já existe,
-        a linha é <strong>atualizada</strong>; se for um Setor novo, a linha é <strong>adicionada</strong>.
-        Nada que não estiver na planilha é apagado.
-      </div>
-      <button class="primary-btn" style="margin-top:0;" onclick="exportarExcel()">⬇ Exportar Excel (dados atuais)</button>
-      <label style="margin-top:16px;">Importar arquivo (.xlsx / .csv)</label>
-      <input type="file" id="adm-import-arquivo" accept=".xlsx,.xls,.csv" onchange="processarArquivoImportacao(event)">
-      <button class="back-btn" style="width:100%; margin-top:12px;" onclick="restaurarBaseInicial()">↺ Restaurar base original da planilha</button>
+    <div class="subtabs">
+      <button class="subtab-btn active" id="subtab-equipe" onclick="mostrarSubAba('equipe')">Cadastro Equipe de Vendas</button>
+      <button class="subtab-btn" id="subtab-categorias" onclick="mostrarSubAba('categorias')">Categorias</button>
     </div>
 
-    <div class="panel">
-      <h2>Cadastro manual</h2>
-      <div class="tabs">
-        <button class="tab-btn" id="adm-tab-gc" onclick="mostrarAbaGerencial('gc')">Gerentes Comerciais</button>
-        <button class="tab-btn" id="adm-tab-operacao" onclick="mostrarAbaGerencial('operacao')">Operações</button>
-        <button class="tab-btn" id="adm-tab-gv" onclick="mostrarAbaGerencial('gv')">GVs</button>
-        <button class="tab-btn" id="adm-tab-rn" onclick="mostrarAbaGerencial('rn')">RNs</button>
+    <!-- ===== SUB-ABA: CADASTRO EQUIPE DE VENDAS ===== -->
+    <div id="subpainel-equipe">
+      <div class="panel">
+        <h2>Importar / Exportar Excel</h2>
+        <div class="hint">
+          Colunas reconhecidas: <strong>Operacao Nome</strong>, <strong>Operacao</strong> (código),
+          <strong>GERENTE COMERCIAL</strong>, <strong>GV</strong> (código), <strong>GV - NOME</strong>,
+          <strong>Setor</strong> (código do RN), <strong>RN - NOME</strong> (opcional).<br><br>
+          Ao importar, cada linha é identificada pelo código do <strong>Setor</strong>: se o Setor já existe,
+          a linha é <strong>atualizada</strong>; se for um Setor novo, a linha é <strong>adicionada</strong>.
+          Nada que não estiver na planilha é apagado.
+        </div>
+        <button class="primary-btn" style="margin-top:0;" onclick="exportarExcel()">⬇ Exportar Excel (dados atuais)</button>
+        <label style="margin-top:16px;">Importar arquivo (.xlsx / .csv)</label>
+        <input type="file" id="adm-import-arquivo" accept=".xlsx,.xls,.csv" onchange="processarArquivoImportacao(event)">
+        <button class="back-btn" style="width:100%; margin-top:12px;" onclick="restaurarBaseInicial()">↺ Restaurar base original da planilha</button>
       </div>
 
-      <div id="adm-painel-gc" class="adm-painel">
-        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-gc" placeholder="Filtrar por nome..." oninput="renderNivel('gc')"></div>
-        <div class="adm-count" id="adm-count-gc"></div>
-        <div class="adm-list" id="adm-lista-gc"></div>
-        <div id="adm-form-gc"></div>
+      <div class="panel">
+        <h2>Cadastro manual</h2>
+        <div class="tabs">
+          <button class="tab-btn" id="adm-tab-gc" onclick="mostrarAbaGerencial('gc')">Gerentes Comerciais</button>
+          <button class="tab-btn" id="adm-tab-operacao" onclick="mostrarAbaGerencial('operacao')">Operações</button>
+          <button class="tab-btn" id="adm-tab-gv" onclick="mostrarAbaGerencial('gv')">GVs</button>
+          <button class="tab-btn" id="adm-tab-rn" onclick="mostrarAbaGerencial('rn')">RNs</button>
+        </div>
+
+        <div id="adm-painel-gc" class="adm-painel">
+          <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-gc" placeholder="Filtrar por nome..." oninput="renderNivel('gc')"></div>
+          <div class="adm-count" id="adm-count-gc"></div>
+          <div class="adm-list" id="adm-lista-gc"></div>
+          <div id="adm-form-gc"></div>
+        </div>
+        <div id="adm-painel-operacao" class="adm-painel" style="display:none;">
+          <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-operacao" placeholder="Filtrar por nome, código ou gerente..." oninput="renderNivel('operacao')"></div>
+          <div class="adm-count" id="adm-count-operacao"></div>
+          <div class="adm-list" id="adm-lista-operacao"></div>
+          <div id="adm-form-operacao"></div>
+        </div>
+        <div id="adm-painel-gv" class="adm-painel" style="display:none;">
+          <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-gv" placeholder="Filtrar por nome, código ou operação..." oninput="renderNivel('gv')"></div>
+          <div class="adm-count" id="adm-count-gv"></div>
+          <div class="adm-list" id="adm-lista-gv"></div>
+          <div id="adm-form-gv"></div>
+        </div>
+        <div id="adm-painel-rn" class="adm-painel" style="display:none;">
+          <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-rn" placeholder="Filtrar por nome, setor ou GV..." oninput="renderNivel('rn')"></div>
+          <div class="adm-count" id="adm-count-rn"></div>
+          <div class="adm-list" id="adm-lista-rn"></div>
+          <div id="adm-form-rn"></div>
+        </div>
       </div>
-      <div id="adm-painel-operacao" class="adm-painel" style="display:none;">
-        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-operacao" placeholder="Filtrar por nome, código ou gerente..." oninput="renderNivel('operacao')"></div>
-        <div class="adm-count" id="adm-count-operacao"></div>
-        <div class="adm-list" id="adm-lista-operacao"></div>
-        <div id="adm-form-operacao"></div>
-      </div>
-      <div id="adm-painel-gv" class="adm-painel" style="display:none;">
-        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-gv" placeholder="Filtrar por nome, código ou operação..." oninput="renderNivel('gv')"></div>
-        <div class="adm-count" id="adm-count-gv"></div>
-        <div class="adm-list" id="adm-lista-gv"></div>
-        <div id="adm-form-gv"></div>
-      </div>
-      <div id="adm-painel-rn" class="adm-painel" style="display:none;">
-        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="adm-filtro-rn" placeholder="Filtrar por nome, setor ou GV..." oninput="renderNivel('rn')"></div>
-        <div class="adm-count" id="adm-count-rn"></div>
-        <div class="adm-list" id="adm-lista-rn"></div>
-        <div id="adm-form-rn"></div>
+    </div>
+
+    <!-- ===== SUB-ABA: CATEGORIAS ===== -->
+    <div id="subpainel-categorias" style="display:none;">
+      <div class="panel">
+        <h2>Categorias de desafios</h2>
+        <div class="hint">
+          Estas são as categorias que os GVs podem escolher ao abrir os desafios do dia.
+          Inativar uma categoria a remove das novas seleções, mas mantém intactos os desafios
+          e resultados que já a utilizaram.
+        </div>
+        <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="cat-filtro" placeholder="Filtrar categoria..." oninput="renderCategorias()"></div>
+        <div class="adm-count" id="cat-count"></div>
+        <div class="adm-list" id="cat-lista"></div>
+
+        <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--divider);">
+          <div class="adm-count" style="margin-bottom:12px;">Cadastrar nova categoria</div>
+          <label>Nome da categoria</label>
+          <input type="text" id="cat-nova-nome" placeholder="Ex: Volume Cerveja">
+          <button class="primary-btn" onclick="cadastrarCategoria()">Cadastrar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -701,20 +775,21 @@
                  -> RN - vendedor (guarda gvId)
 ================================================================ */
 
-const CATEGORIAS = [
-  { id: 'VOLUME_CERVEJA',        label: 'Volume Cerveja' },
-  { id: 'VOLUME_RGB',            label: 'Volume RGB' },
-  { id: 'VOLUME_HIGH_END',       label: 'Volume High End' },
-  { id: 'VOLUME_NAB',            label: 'Volume NAB' },
-  { id: 'TASKS_TOTAIS',          label: 'Tasks Totais' },
-  { id: 'DISTRIBUICAO_RGB',      label: 'Distribuição RGB' },
-  { id: 'COMPRADORES_STELLA_PG', label: 'Compradores Stella PG' },
-  { id: 'TASKS_COMPRA',          label: 'Tasks de Compra' },
-  { id: 'MIX_S5',                label: 'Mix S5' },
-  { id: 'FATURAMENTO_SCORE5',    label: 'Faturamento Score5' },
-  { id: 'MIX_LN',                label: 'Mix +LN' },
-  // Para adicionar uma nova categoria, copie a linha abaixo e edite:
-  // { id: 'NOVA_CATEGORIA', label: 'Nome que aparece na tela' },
+// Categorias iniciais (semente). Depois de carregadas, ficam editáveis
+// pela sub-aba "Categorias" do Painel Gerencial e são salvas no banco.
+// Cada categoria tem: id, label e ativa (true = disponível para os GVs).
+const CATEGORIAS_INICIAIS = [
+  { id: 'VOLUME_CERVEJA',        label: 'Volume Cerveja',        ativa: true },
+  { id: 'VOLUME_RGB',            label: 'Volume RGB',            ativa: true },
+  { id: 'VOLUME_HIGH_END',       label: 'Volume High End',       ativa: true },
+  { id: 'VOLUME_NAB',            label: 'Volume NAB',            ativa: true },
+  { id: 'TASKS_TOTAIS',          label: 'Tasks Totais',          ativa: true },
+  { id: 'DISTRIBUICAO_RGB',      label: 'Distribuição RGB',      ativa: true },
+  { id: 'COMPRADORES_STELLA_PG', label: 'Compradores Stella PG', ativa: true },
+  { id: 'TASKS_COMPRA',          label: 'Tasks de Compra',       ativa: true },
+  { id: 'MIX_S5',                label: 'Mix S5',                ativa: true },
+  { id: 'FATURAMENTO_SCORE5',    label: 'Faturamento Score5',    ativa: true },
+  { id: 'MIX_LN',                label: 'Mix +LN',               ativa: true }
 ];
 
 // Usuários com acesso ao Painel Gerencial (desenvolvedores/admin).
@@ -970,6 +1045,29 @@ function restaurarBaseInicial(){
 
 let organizacao = carregarOrganizacao();
 
+/* ---------------- Persistência das categorias de desafios ---------------- */
+
+const CHAVE_CATEGORIAS = 'categorias_desafios_v1';
+
+function carregarCategorias(){
+  const bruto = localStorage.getItem(CHAVE_CATEGORIAS);
+  if(bruto){
+    try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed abaixo */ }
+  }
+  const semente = clonar(CATEGORIAS_INICIAIS);
+  localStorage.setItem(CHAVE_CATEGORIAS, JSON.stringify(semente));
+  return semente;
+}
+
+function salvarCategorias(){
+  localStorage.setItem(CHAVE_CATEGORIAS, JSON.stringify(categorias));
+  return Promise.resolve({ ok: true });
+}
+
+// Lista completa (para o painel gerencial) e só as ativas (para os GVs).
+let categorias = carregarCategorias();
+function categoriasAtivas(){ return categorias.filter(c => c.ativa); }
+
 
 /* ---------------- Estado em memória da sessão atual ---------------- */
 let sessaoGerente = null;   // { gerenteId, nome, operacaoId }
@@ -1093,7 +1191,7 @@ function logoutGerente(){
 function renderizarChecklistCategorias(){
   const container = document.getElementById('ger-cat-list');
   container.innerHTML = '';
-  CATEGORIAS.forEach(cat => {
+  categoriasAtivas().forEach(cat => {
     const row = document.createElement('div');
     row.className = 'cat-toggle';
     row.dataset.catId = cat.id;
@@ -1226,7 +1324,9 @@ async function carregarDesafiosDoVendedor(){
 
   const config = await carregarConfigDoDiaDoBackend(sessaoVendedor.gerenteId, data);
   const abertasIds = config ? config.categoriasAbertas : [];
-  const categoriasAbertas = CATEGORIAS.filter(c => abertasIds.includes(c.id));
+  // Usa a lista completa (não só ativas): se uma categoria foi inativada depois
+  // que o GV já abriu o desafio, o RN ainda precisa vê-la para responder.
+  const categoriasAbertas = categorias.filter(c => abertasIds.includes(c.id));
 
   if(categoriasAbertas.length === 0){
     container.innerHTML = '<div class="empty-state">Seu gerente ainda não abriu os desafios de hoje.<br>Volte a checar mais tarde.</div>';
@@ -1305,6 +1405,7 @@ function loginGerencial(){
   }
   erroEl.textContent = '';
   irPara('screen-gerencial-dashboard');
+  mostrarSubAba('equipe');
   mostrarAbaGerencial('gc');
 }
 
@@ -1318,6 +1419,123 @@ function mostrarAbaGerencial(nivel){
     document.getElementById(`adm-painel-${k}`).style.display = (k === nivel) ? 'block' : 'none';
   });
   renderNivel(nivel);
+}
+
+/* ---------------- Sub-abas do Painel Gerencial ---------------- */
+
+function mostrarSubAba(qual){
+  document.getElementById('subtab-equipe').classList.toggle('active', qual === 'equipe');
+  document.getElementById('subtab-categorias').classList.toggle('active', qual === 'categorias');
+  document.getElementById('subpainel-equipe').style.display = (qual === 'equipe') ? 'block' : 'none';
+  document.getElementById('subpainel-categorias').style.display = (qual === 'categorias') ? 'block' : 'none';
+  if(qual === 'categorias') renderCategorias();
+}
+
+/* ---------------- Gestão de categorias de desafios ---------------- */
+
+function renderCategorias(){
+  const listaEl = document.getElementById('cat-lista');
+  const countEl = document.getElementById('cat-count');
+  const filtroEl = document.getElementById('cat-filtro');
+  const termo = filtroEl ? filtroEl.value.trim().toLowerCase() : '';
+
+  const filtradas = termo
+    ? categorias.filter(c => c.label.toLowerCase().includes(termo))
+    : categorias;
+
+  const ativas = categorias.filter(c => c.ativa).length;
+  countEl.textContent = termo
+    ? `${filtradas.length} de ${categorias.length} categoria(s)`
+    : `${categorias.length} categoria(s) · ${ativas} ativa(s)`;
+
+  if(categorias.length === 0){
+    listaEl.innerHTML = '<div class="empty-state">Nenhuma categoria cadastrada.</div>';
+    return;
+  }
+  if(filtradas.length === 0){
+    listaEl.innerHTML = '<div class="empty-state">Nenhum resultado para esse filtro.</div>';
+    return;
+  }
+
+  listaEl.innerHTML = filtradas.map(cat => {
+    const tag = cat.ativa ? '' : '<span class="status-tag inativa">Inativa</span>';
+    const btnStatus = cat.ativa
+      ? `<button class="mini-btn danger" onclick="alternarCategoria('${cat.id}')">Inativar</button>`
+      : `<button class="mini-btn" onclick="alternarCategoria('${cat.id}')">Reativar</button>`;
+    return `
+      <div class="adm-row">
+        <div class="info">
+          <div class="adm-row-nome">${cat.label}${tag}</div>
+        </div>
+        <div class="actions">
+          <button class="mini-btn" onclick="editarCategoria('${cat.id}')">Editar</button>
+          ${btnStatus}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function idCategoriaAPartirDoNome(nome){
+  // Gera um id estável a partir do nome (maiúsculas, sem acento, com _)
+  const base = nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'');
+  let id = base || 'CAT';
+  let n = 2;
+  while(categorias.some(c => c.id === id)){ id = `${base}_${n++}`; }
+  return id;
+}
+
+async function cadastrarCategoria(){
+  const input = document.getElementById('cat-nova-nome');
+  const nome = input.value.trim();
+  if(!nome){ mostrarToast('Digite o nome da categoria.'); return; }
+  if(categorias.some(c => c.label.trim().toLowerCase() === nome.toLowerCase())){
+    mostrarToast('Já existe uma categoria com esse nome.');
+    return;
+  }
+  categorias.push({ id: idCategoriaAPartirDoNome(nome), label: nome, ativa: true });
+  await salvarCategorias();
+  input.value = '';
+  renderCategorias();
+  mostrarToast('Categoria cadastrada.');
+}
+
+async function alternarCategoria(id){
+  const cat = categorias.find(c => c.id === id);
+  if(!cat) return;
+  if(cat.ativa && !confirm(`Inativar "${cat.label}"? Ela deixará de aparecer para os GVs em novos desafios, mas desafios já abertos com ela continuam intactos.`)) return;
+  cat.ativa = !cat.ativa;
+  await salvarCategorias();
+  renderCategorias();
+  mostrarToast(cat.ativa ? 'Categoria reativada.' : 'Categoria inativada.');
+}
+
+let categoriaEditando = null;
+
+function editarCategoria(id){
+  const cat = categorias.find(c => c.id === id);
+  if(!cat) return;
+  categoriaEditando = id;
+  document.getElementById('modal-titulo').textContent = 'Editar categoria';
+  document.getElementById('modal-campos').innerHTML = `
+    <label>Nome da categoria</label>
+    <input type="text" id="modal-campo-catlabel" value="${cat.label.replace(/"/g,'&quot;')}">
+  `;
+  // Redireciona o botão salvar do modal para a função de categoria
+  document.getElementById('modal-edicao').dataset.tipo = 'categoria';
+  document.getElementById('modal-edicao').classList.add('active');
+}
+
+async function salvarEdicaoCategoria(){
+  const cat = categorias.find(c => c.id === categoriaEditando);
+  if(!cat) return;
+  const novoNome = document.getElementById('modal-campo-catlabel').value.trim();
+  if(!novoNome){ mostrarToast('Digite o nome da categoria.'); return; }
+  cat.label = novoNome;
+  await salvarCategorias();
+  fecharModalEdicao();
+  renderCategorias();
+  mostrarToast('Categoria atualizada.');
 }
 
 /* ---------------- Renderização genérica de lista + formulário ---------------- */
@@ -1488,15 +1706,25 @@ function editarItemNivel(nivel, id){
   }
 
   document.getElementById('modal-campos').innerHTML = camposHtml + paiHtml;
+  document.getElementById('modal-edicao').dataset.tipo = 'organizacao';
   document.getElementById('modal-edicao').classList.add('active');
 }
 
 function fecharModalEdicao(){
-  document.getElementById('modal-edicao').classList.remove('active');
+  const modal = document.getElementById('modal-edicao');
+  modal.classList.remove('active');
+  modal.dataset.tipo = '';
   edicaoAtual = { nivel: null, id: null };
+  categoriaEditando = null;
 }
 
 async function salvarEdicaoModal(){
+  // O modal é compartilhado: pode estar editando uma categoria ou um item da organização.
+  if(document.getElementById('modal-edicao').dataset.tipo === 'categoria'){
+    await salvarEdicaoCategoria();
+    return;
+  }
+
   const { nivel, id } = edicaoAtual;
   if(!nivel || !id) return;
   const cfg = NIVEIS[nivel];
