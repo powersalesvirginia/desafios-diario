@@ -810,6 +810,8 @@
         <label for="res-valor">Selecione</label>
         <select id="res-valor" onchange="renderResultados()"></select>
       </div>
+
+      <button class="primary-btn" onclick="exportarResultadosExcel()">⬇ Exportar resultados (Excel)</button>
     </div>
 
     <div id="res-conteudo"></div>
@@ -2230,6 +2232,96 @@ function gvsDoFiltro(tipo, valorId){
   }
   // todos: qualquer GV (o filtro de "ter desafio" é aplicado depois)
   return organizacao.gvs.slice();
+}
+
+// Exporta pra Excel exatamente o que está filtrado na tela (mesmo escopo:
+// um GV específico, uma Operação inteira, um Gerente Comercial inteiro, ou
+// Todos). Uma linha por combinação RN × categoria aberta naquele dia.
+async function exportarResultadosExcel(){
+  const data = document.getElementById('res-data').value || hojeISO();
+  const tipo = document.getElementById('res-tipo').value;
+  const valorId = document.getElementById('res-valor').value;
+
+  if(tipo !== 'todos' && !valorId){
+    mostrarToast('Selecione uma opção de filtro antes de exportar.');
+    return;
+  }
+
+  mostrarToast('Preparando exportação...');
+
+  const gvs = gvsDoFiltro(tipo, valorId);
+
+  const [mapaConfigs, resultadosDoDia] = await Promise.all([
+    obterConfigsDoDiaBackend(data),
+    obterResultadosDoDiaBackend(data)
+  ]);
+
+  if(mapaConfigs === null || resultadosDoDia === null){
+    mostrarToast('Não consegui buscar os dados para exportar agora.');
+    return;
+  }
+
+  const mapaResultados = {};
+  resultadosDoDia.forEach(r => { mapaResultados[r.vendedorId] = r; });
+
+  const linhas = [];
+  gvs.forEach(gv => {
+    const config = mapaConfigs[gv.id];
+    if(!config || !config.categoriasAbertas || config.categoriasAbertas.length === 0) return;
+
+    const cats = categorias.filter(c => config.categoriasAbertas.includes(c.id));
+    const op = organizacao.operacoes.find(o => o.id === gv.operacaoId);
+    const gc = op ? organizacao.gerentesComerciais.find(g => g.id === op.gerenteComercialId) : null;
+
+    const rns = organizacao.rns
+      .filter(r => r.gvId === gv.id)
+      .sort((a, b) => {
+        const na = parseInt(a.codigo, 10), nb = parseInt(b.codigo, 10);
+        if(!isNaN(na) && !isNaN(nb)) return na - nb;
+        return String(a.codigo).localeCompare(String(b.codigo));
+      });
+
+    rns.forEach(rn => {
+      const resultado = mapaResultados[rn.id] || null;
+      cats.forEach(cat => {
+        const v = resultado && resultado.valores ? resultado.valores[cat.id] : null;
+        const preenchida = v && !(v.desafio === 0 && v.realizado === 0);
+        linhas.push({
+          'Data': formatarDataBR(data),
+          'Gerente Comercial': gc ? gc.nome : '',
+          'Operação': op ? op.nome : '',
+          'GV': gv.nome,
+          'RN': nomeExibicaoRN(rn),
+          'Código RN': rn.codigo || '',
+          'Categoria': cat.label,
+          'Desafio': preenchida ? v.desafio : '',
+          'Realizado': preenchida ? v.realizado : '',
+          'Atingimento (%)': preenchida ? v.atingimento : '',
+          'Editado por': (resultado && resultado.editadoPor) ? resultado.editadoPor : ''
+        });
+      });
+    });
+  });
+
+  if(linhas.length === 0){
+    mostrarToast('Nada para exportar com esse filtro/data.');
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(linhas, {
+    header: ['Data','Gerente Comercial','Operação','GV','RN','Código RN','Categoria','Desafio','Realizado','Atingimento (%)','Editado por']
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Resultados');
+
+  const opcaoSelecionada = document.getElementById('res-valor');
+  const rotuloFiltro = tipo === 'todos'
+    ? 'todos'
+    : (opcaoSelecionada.selectedOptions[0] ? opcaoSelecionada.selectedOptions[0].textContent : tipo);
+  const slug = rotuloFiltro.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').toLowerCase();
+
+  XLSX.writeFile(wb, `resultados-${slug}-${data}.xlsx`);
+  mostrarToast('Excel exportado.');
 }
 
 async function renderResultados(){
