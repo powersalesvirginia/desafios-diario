@@ -1506,6 +1506,28 @@ async function obterMeuResultadoDoDiaBackend(vendedorId, data){
   }
 }
 
+// Busca, numa ÚNICA chamada ao servidor, a config diária de um GV + o
+// resultado de um RN naquela mesma data. Usado nas telas de "preencher
+// desafio" (RN) e "lançar retroativo" (GV), que precisam das duas coisas
+// ao mesmo tempo — combinar num só pedido evita duas idas e voltas e deixa
+// o carregamento bem mais rápido.
+async function carregarContextoDesafioBackend(gerenteId, vendedorId, data){
+  try{
+    const dados = await apiGet(`tipo=contexto&gerenteId=${encodeURIComponent(gerenteId)}&vendedorId=${encodeURIComponent(vendedorId)}&data=${encodeURIComponent(data)}`);
+    if(dados.config) localStorage.setItem(`desafios_config_${gerenteId}_${data}`, JSON.stringify(dados.config));
+    if(dados.resultado) localStorage.setItem(`desafios_resultado_${vendedorId}_${data}`, JSON.stringify(dados.resultado));
+    return { config: dados.config || null, resultado: dados.resultado || null };
+  }catch(e){
+    // Sem conexão: monta a resposta a partir do que tiver salvo neste navegador.
+    const configBruto = localStorage.getItem(`desafios_config_${gerenteId}_${data}`);
+    const resultadoBruto = localStorage.getItem(`desafios_resultado_${vendedorId}_${data}`);
+    return {
+      config: configBruto ? JSON.parse(configBruto) : null,
+      resultado: resultadoBruto ? JSON.parse(resultadoBruto) : null
+    };
+  }
+}
+
 
 /* =====================================================================
    LOGIN — GERENTE
@@ -1700,10 +1722,9 @@ async function carregarRetroativo(){
   container.innerHTML = '<div class="empty-state">Carregando...</div>';
   btnSalvar.style.display = 'none';
 
-  const [config, resultadoAnterior] = await Promise.all([
-    carregarConfigDoDiaDoBackend(sessaoGerente.gerenteId, data),
-    obterMeuResultadoDoDiaBackend(rnId, data)
-  ]);
+  const { config, resultado: resultadoAnterior } = await carregarContextoDesafioBackend(
+    sessaoGerente.gerenteId, rnId, data
+  );
 
   const abertasIds = config ? config.categoriasAbertas : [];
   const categoriasAbertas = categorias.filter(c => abertasIds.includes(c.id));
@@ -1827,12 +1848,11 @@ async function carregarDesafiosDoVendedor(){
   const btnEnviar = document.getElementById('ven-enviar-btn');
   container.innerHTML = '<div class="empty-state">Carregando...</div>';
 
-  // Busca em paralelo: quais categorias o GV abriu + o que o próprio RN já
-  // tinha enviado antes hoje (para pré-preencher em vez de vir tudo em branco).
-  const [config, meuResultadoAnterior] = await Promise.all([
-    carregarConfigDoDiaDoBackend(sessaoVendedor.gerenteId, data),
-    obterMeuResultadoDoDiaBackend(sessaoVendedor.vendedorId, data)
-  ]);
+  // Busca em uma só chamada: quais categorias o GV abriu + o que o próprio
+  // RN já tinha enviado antes hoje (pra pré-preencher em vez de vir em branco).
+  const { config, resultado: meuResultadoAnterior } = await carregarContextoDesafioBackend(
+    sessaoVendedor.gerenteId, sessaoVendedor.vendedorId, data
+  );
 
   const abertasIds = config ? config.categoriasAbertas : [];
   // Usa a lista completa (não só ativas): se uma categoria foi inativada depois
