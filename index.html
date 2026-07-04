@@ -1446,6 +1446,24 @@ async function obterResultadosDoDiaBackend(data){
   }
 }
 
+// Busca o resultado que o próprio RN já enviou numa data (para pré-preencher
+// a tela dele ao voltar, em vez de aparecer tudo em branco de novo).
+async function obterMeuResultadoDoDiaBackend(vendedorId, data){
+  const chave = `desafios_resultado_${vendedorId}_${data}`;
+  try{
+    const dados = await apiGet(`tipo=resultado&vendedorId=${encodeURIComponent(vendedorId)}&data=${encodeURIComponent(data)}`);
+    if(dados && dados.valores){
+      localStorage.setItem(chave, JSON.stringify(dados));
+      return dados;
+    }
+    return null;
+  }catch(e){
+    // Sem conexão: usa o que tiver salvo neste navegador, se tiver.
+    const bruto = localStorage.getItem(chave);
+    return bruto ? JSON.parse(bruto) : null;
+  }
+}
+
 
 /* =====================================================================
    LOGIN — GERENTE
@@ -1653,7 +1671,13 @@ async function carregarDesafiosDoVendedor(){
   const btnEnviar = document.getElementById('ven-enviar-btn');
   container.innerHTML = '<div class="empty-state">Carregando...</div>';
 
-  const config = await carregarConfigDoDiaDoBackend(sessaoVendedor.gerenteId, data);
+  // Busca em paralelo: quais categorias o GV abriu + o que o próprio RN já
+  // tinha enviado antes hoje (para pré-preencher em vez de vir tudo em branco).
+  const [config, meuResultadoAnterior] = await Promise.all([
+    carregarConfigDoDiaDoBackend(sessaoVendedor.gerenteId, data),
+    obterMeuResultadoDoDiaBackend(sessaoVendedor.vendedorId, data)
+  ]);
+
   const abertasIds = config ? config.categoriasAbertas : [];
   // Usa a lista completa (não só ativas): se uma categoria foi inativada depois
   // que o GV já abriu o desafio, o RN ainda precisa vê-la para responder.
@@ -1665,8 +1689,14 @@ async function carregarDesafiosDoVendedor(){
     return;
   }
 
+  const valoresAnteriores = (meuResultadoAnterior && meuResultadoAnterior.valores) ? meuResultadoAnterior.valores : {};
+
   container.innerHTML = '';
   categoriasAbertas.forEach(cat => {
+    const anterior = valoresAnteriores[cat.id];
+    const valDesafio = anterior && anterior.desafio ? anterior.desafio : '';
+    const valRealizado = anterior && anterior.realizado ? anterior.realizado : '';
+
     const card = document.createElement('div');
     card.className = 'desafio-card';
     card.innerHTML = `
@@ -1674,12 +1704,12 @@ async function carregarDesafiosDoVendedor(){
       <div class="desafio-campos">
         <div class="campo">
           <label>Desafio (meta)</label>
-          <input type="number" inputmode="decimal" min="0" step="any" placeholder="0"
+          <input type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="${valDesafio}"
                  data-cat-id="${cat.id}" data-tipo="desafio" oninput="recalcularPct('${cat.id}')">
         </div>
         <div class="campo">
           <label>Realizado</label>
-          <input type="number" inputmode="decimal" min="0" step="any" placeholder="0"
+          <input type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="${valRealizado}"
                  data-cat-id="${cat.id}" data-tipo="realizado" oninput="recalcularPct('${cat.id}')">
         </div>
         <div class="pct">
@@ -1689,8 +1719,13 @@ async function carregarDesafiosDoVendedor(){
       </div>
     `;
     container.appendChild(card);
+    if(valDesafio !== '' || valRealizado !== '') recalcularPct(cat.id);
   });
   btnEnviar.style.display = 'block';
+
+  if(meuResultadoAnterior){
+    mostrarToast('Seus valores salvos anteriormente foram carregados.');
+  }
 }
 
 // Calcula o atingimento (Realizado ÷ Desafio × 100) de uma categoria.
