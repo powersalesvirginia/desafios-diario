@@ -1478,6 +1478,20 @@ async function enviarValoresNoBackend(registro){
   await apiPost({ tipo: 'resultado', ...registro });
 }
 
+// Busca no Sheets a config diária de TODOS os GVs numa data, de uma vez.
+// Devolve um mapa gerenteId -> config, pra tela de Resultados não precisar
+// fazer uma chamada por GV.
+async function obterConfigsDoDiaBackend(data){
+  try{
+    const lista = await apiGet(`tipo=configsdodia&data=${encodeURIComponent(data)}`);
+    const mapa = {};
+    (Array.isArray(lista) ? lista : []).forEach(c => { mapa[c.gerenteId] = c; });
+    return mapa;
+  }catch(e){
+    return null; // sinaliza "sem conexão" pra quem chamou
+  }
+}
+
 // Busca no Sheets todos os resultados de uma data (usado na tela de Resultados).
 async function obterResultadosDoDiaBackend(data){
   try{
@@ -2013,7 +2027,7 @@ async function abrirResultados(){
   document.getElementById('res-valor-wrap').style.display = 'none';
   irPara('screen-resultados');
   await sincronizarComBackend(true);
-  renderResultados();
+  await renderResultados();
 }
 
 function aoMudarTipoResultado(){
@@ -2070,14 +2084,15 @@ async function renderResultados(){
 
   const gvs = gvsDoFiltro(tipo, valorId);
 
-  // Busca, em paralelo, a config diária de cada GV candidato + todos os
-  // resultados já enviados nessa data (uma única chamada pro segundo caso).
-  const [configs, resultadosDoDia] = await Promise.all([
-    Promise.all(gvs.map(gv => carregarConfigDoDiaDoBackend(gv.id, data))),
+  // Busca em paralelo, mas cada uma numa ÚNICA chamada (não importa quantos
+  // GVs tenham desafios): todas as configs diárias da data + todos os
+  // resultados já enviados nela.
+  const [mapaConfigs, resultadosDoDia] = await Promise.all([
+    obterConfigsDoDiaBackend(data),
     obterResultadosDoDiaBackend(data)
   ]);
 
-  if(resultadosDoDia === null){
+  if(mapaConfigs === null || resultadosDoDia === null){
     container.innerHTML = '<div class="panel"><div class="empty-state">Não consegui buscar os resultados agora (sem conexão com o servidor). Tente novamente em instantes.</div></div>';
     return;
   }
@@ -2087,8 +2102,8 @@ async function renderResultados(){
   resultadosDoDia.forEach(r => { mapaResultados[r.vendedorId] = r; });
 
   const blocos = [];
-  gvs.forEach((gv, i) => {
-    const config = configs[i];
+  gvs.forEach(gv => {
+    const config = mapaConfigs[gv.id];
     if(!config || !config.categoriasAbertas || config.categoriasAbertas.length === 0) return;
 
     const cats = categorias.filter(c => config.categoriasAbertas.includes(c.id));
