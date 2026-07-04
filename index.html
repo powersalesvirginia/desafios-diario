@@ -170,7 +170,15 @@
     font-family:var(--font-body);
     font-size:15px;
     outline:none;
+    text-align:left;
   }
+  input[type="date"]{
+    -webkit-appearance:none;
+    appearance:none;
+    min-height:44px;
+    text-align:left;
+  }
+  input[type="date"]::-webkit-date-and-time-value{ text-align:left; }
   select:focus, input:focus{ border-color:var(--amber); }
   select:disabled{ opacity:0.4; }
 
@@ -585,11 +593,12 @@
   .rn-media-val{
     font-family:var(--font-display);
     font-weight:700;
-    font-size:16px;
+    font-size:14px;
+    white-space:nowrap;
   }
   .rn-media-val.ok{ color:var(--success); }
   .rn-media-val.baixo{ color:var(--amber); }
-  .rn-media-val.vazio{ color:var(--chalk-dim); opacity:0.6; font-size:13px; }
+  .rn-media-val.vazio{ color:var(--chalk-dim); opacity:0.6; font-size:13px; font-weight:600; }
   .rn-seta{ font-size:11px; color:var(--chalk-dim); transition:transform .15s; }
   .rn-item.aberto .rn-seta{ transform:rotate(180deg); }
 
@@ -1820,14 +1829,15 @@ function montarBlocoGV(gv, op, gc, cats, rns, data){
     const nome = nomeExibicaoRN(rn);
     const rid = `${gv.id}_${rn.id}`.replace(/[^a-zA-Z0-9_]/g,'');
 
-    // Média de atingimento das categorias preenchidas.
-    let somaPct = 0, qtdPreenchidas = 0;
+    // Contagem de desafios "Ok" (atingimento >= 100%) sobre o total de categorias abertas.
+    let qtdOk = 0;
+    const totalCats = cats.length;
     const linhas = cats.map(c => {
       const v = resultado && resultado.valores ? resultado.valores[c.id] : null;
       const preenchida = v && !(v.desafio === 0 && v.realizado === 0);
       if(preenchida){
         const pct = v.atingimento != null ? v.atingimento : 0;
-        somaPct += pct; qtdPreenchidas++;
+        if(pct >= 100) qtdOk++;
         const classe = pct >= 100 ? 'ok' : 'baixo';
         return `<tr>
           <td class="cat-nome">${c.label}</td>
@@ -1844,10 +1854,11 @@ function montarBlocoGV(gv, op, gc, cats, rns, data){
       </tr>`;
     }).join('');
 
+    const temEnvio = !!(resultado && resultado.valores);
     let mediaHtml;
-    if(qtdPreenchidas > 0){
-      const media = somaPct / qtdPreenchidas;
-      mediaHtml = `<span class="rn-media-val ${media >= 100 ? 'ok' : 'baixo'}">${media.toFixed(0)}%</span>`;
+    if(temEnvio){
+      const classe = qtdOk > 0 ? 'ok' : 'baixo';
+      mediaHtml = `<span class="rn-media-val ${classe}">Ok: ${qtdOk} de ${totalCats}</span>`;
     }else{
       mediaHtml = `<span class="rn-media-val vazio">sem envio</span>`;
     }
