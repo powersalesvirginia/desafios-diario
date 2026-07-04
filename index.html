@@ -49,6 +49,14 @@
     min-height:100vh;
     display:flex;
     flex-direction:column;
+    transition:max-width .15s ease;
+  }
+  /* Container mais largo só pra tela de Resultados, que tem tabelas com
+     várias colunas e se beneficia de mais espaço em telas grandes. Em
+     celulares (viewport estreito) não faz diferença, já que 100% da tela
+     é sempre usado de qualquer forma. */
+  #app.app-largo{
+    max-width:1100px;
   }
 
   .screen{ display:none; }
@@ -1547,6 +1555,10 @@ let sessaoVendedor = null;  // { vendedorId, nome, gerenteId }
 function irPara(idTela){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(idTela).classList.add('active');
+  // A tela de Resultados é a única que se beneficia de mais largura em telas
+  // grandes (tabela com várias colunas). As demais continuam no layout
+  // pensado para celular.
+  document.getElementById('app').classList.toggle('app-largo', idTela === 'screen-resultados');
 }
 
 function mostrarToast(msg){
