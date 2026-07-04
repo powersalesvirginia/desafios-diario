@@ -318,6 +318,42 @@
     line-height:1.6;
   }
 
+  /* ---------- Estado de carregamento (reticências animadas) ---------- */
+  .loading-state{
+    text-align:center;
+    color:var(--chalk-dim);
+    font-size:14px;
+    padding:30px 10px;
+    line-height:1.6;
+  }
+  .loading-inline{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    color:var(--chalk-dim);
+    font-size:12.5px;
+    margin-top:10px;
+  }
+  .loading-dots{
+    display:inline-flex;
+    align-items:center;
+    gap:3px;
+  }
+  .loading-dots .dot{
+    width:5px;
+    height:5px;
+    border-radius:50%;
+    background:currentColor;
+    opacity:0.3;
+    animation:loadingDotPulse 1.2s infinite ease-in-out;
+  }
+  .loading-dots .dot:nth-child(2){ animation-delay:0.2s; }
+  .loading-dots .dot:nth-child(3){ animation-delay:0.4s; }
+  @keyframes loadingDotPulse{
+    0%, 80%, 100%{ opacity:0.25; transform:scale(0.8); }
+    40%{ opacity:1; transform:scale(1.2); }
+  }
+
   .badge{
     display:inline-block;
     background:var(--board-lighter);
@@ -725,6 +761,7 @@
 
     <div class="panel">
       <h2>Identificação</h2>
+      <div id="ger-login-carregando" style="display:none;"></div>
       <label for="ger-operacao">Operação</label>
       <select id="ger-operacao" onchange="popularGerentesDoLogin()"></select>
 
@@ -812,6 +849,7 @@
 
     <div class="panel">
       <h2>Identificação</h2>
+      <div id="ven-login-carregando" style="display:none;"></div>
       <label for="ven-operacao">Operação</label>
       <select id="ven-operacao" onchange="popularGerentesDoVendedorLogin()"></select>
 
@@ -856,6 +894,7 @@
 
     <div class="panel">
       <h2>Acesso restrito</h2>
+      <div id="ger-cial-carregando" style="display:none;"></div>
       <label for="ger-cial-user">Usuário</label>
       <select id="ger-cial-user"></select>
 
@@ -1335,12 +1374,24 @@ let admins = carregarAdminsLocal();
 function categoriasAtivas(){ return categorias.filter(c => c.ativa); }
 
 let backendOk = false; // vira true assim que uma sincronização der certo
+let ultimaSincronizacaoTs = 0;
+const INTERVALO_MIN_SINCRONIZACAO = 20000; // 20s: evita rebuscar tudo de novo se a pessoa só navegou entre telas
 
 // Busca tudo do Sheets. Se vier vazio e houver dado local, migra (sobe) uma vez.
-async function sincronizarComBackend(silencioso){
+// `forcar=true` ignora o intervalo mínimo e busca mesmo assim (usado depois
+// de salvar algo, por exemplo).
+async function sincronizarComBackend(silencioso, forcar){
+  const agora = Date.now();
+  if(!forcar && backendOk && (agora - ultimaSincronizacaoTs) < INTERVALO_MIN_SINCRONIZACAO){
+    // Sincronizado recentemente: usa o que já está em memória, sem gastar uma
+    // chamada de rede à toa. Isso é o que deixa a navegação entre telas quase
+    // instantânea quando a pessoa vai e volta em poucos segundos.
+    return true;
+  }
   try{
     const dados = await apiGet('tipo=tudo');
     backendOk = true;
+    ultimaSincronizacaoTs = Date.now();
 
     const orgVazia = !dados.organizacao ||
       (dados.organizacao.gerentesComerciais.length === 0 &&
@@ -1434,6 +1485,20 @@ function mostrarToast(msg){
   t.textContent = msg;
   t.style.display = 'block';
   setTimeout(() => { t.style.display = 'none'; }, 2200);
+}
+
+// Reticências animadas (usadas em todo lugar que espera dados do servidor).
+function pontosCarregando(){
+  return `<span class="loading-dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>`;
+}
+// Bloco de carregamento centralizado, pra substituir o conteúdo de uma área
+// (ex: lista de desafios, resultados) enquanto os dados não chegam.
+function htmlCarregando(texto){
+  return `<div class="loading-state">${texto} ${pontosCarregando()}</div>`;
+}
+// Versão fina, pra usar embaixo de um título/rótulo sem ocupar a tela toda.
+function htmlCarregandoInline(texto){
+  return `<div class="loading-inline">${texto} ${pontosCarregando()}</div>`;
 }
 
 function hojeISO(){
@@ -1571,7 +1636,11 @@ function inicializarTelaLoginGerente(){
 
 async function abrirLoginGerente(){
   irPara('screen-gerente-login');
+  const carregandoEl = document.getElementById('ger-login-carregando');
+  carregandoEl.innerHTML = htmlCarregandoInline('Buscando operações e GVs');
+  carregandoEl.style.display = 'flex';
   await sincronizarComBackend(true);
+  carregandoEl.style.display = 'none';
   inicializarTelaLoginGerente();
 }
 
@@ -1631,7 +1700,8 @@ async function carregarConfigDoDia(){
   if(!sessaoGerente) return;
   const data = document.getElementById('ger-data-referencia').value || hojeISO();
   const statusEl = document.getElementById('ger-save-status');
-  statusEl.textContent = '';
+  statusEl.style.color = 'var(--chalk-dim)';
+  statusEl.innerHTML = htmlCarregandoInline('Buscando desafios dessa data');
 
   const config = await carregarConfigDoDiaDoBackend(sessaoGerente.gerenteId, data);
   const abertas = config ? config.categoriasAbertas : [];
@@ -1639,6 +1709,7 @@ async function carregarConfigDoDia(){
   document.querySelectorAll('#ger-cat-list .cat-toggle').forEach(row => {
     row.classList.toggle('on', abertas.includes(row.dataset.catId));
   });
+  statusEl.textContent = '';
 }
 
 async function salvarConfigDoDia(){
@@ -1733,7 +1804,7 @@ async function carregarRetroativo(){
   const container = document.getElementById('retro-lista-container');
   const btnSalvar = document.getElementById('retro-salvar-btn');
   painel.style.display = 'block';
-  container.innerHTML = '<div class="empty-state">Carregando...</div>';
+  container.innerHTML = htmlCarregando('Carregando desafios');
   btnSalvar.style.display = 'none';
 
   const { config, resultado: resultadoAnterior } = await carregarContextoDesafioBackend(
@@ -1801,7 +1872,11 @@ function inicializarTelaLoginVendedor(){
 
 async function abrirLoginVendedor(){
   irPara('screen-vendedor-login');
+  const carregandoEl = document.getElementById('ven-login-carregando');
+  carregandoEl.innerHTML = htmlCarregandoInline('Buscando operações e GVs');
+  carregandoEl.style.display = 'flex';
   await sincronizarComBackend(true);
+  carregandoEl.style.display = 'none';
   inicializarTelaLoginVendedor();
 }
 
@@ -1860,7 +1935,7 @@ async function carregarDesafiosDoVendedor(){
 
   const container = document.getElementById('ven-lista-container');
   const btnEnviar = document.getElementById('ven-enviar-btn');
-  container.innerHTML = '<div class="empty-state">Carregando...</div>';
+  container.innerHTML = htmlCarregando('Carregando desafios');
 
   // Busca em uma só chamada: quais categorias o GV abriu + o que o próprio
   // RN já tinha enviado antes hoje (pra pré-preencher em vez de vir em branco).
@@ -2080,7 +2155,7 @@ async function renderResultados(){
     return;
   }
 
-  container.innerHTML = '<div class="panel"><div class="empty-state">Carregando resultados...</div></div>';
+  container.innerHTML = `<div class="panel">${htmlCarregando('Carregando resultados')}</div>`;
 
   const gvs = gvsDoFiltro(tipo, valorId);
 
@@ -2237,7 +2312,11 @@ function alternarTodosRN(btn){
 
 async function abrirGerencial(){
   irPara('screen-gerencial-login');
+  const carregandoEl = document.getElementById('ger-cial-carregando');
+  carregandoEl.innerHTML = htmlCarregandoInline('Verificando usuários');
+  carregandoEl.style.display = 'flex';
   await sincronizarComBackend(true);
+  carregandoEl.style.display = 'none';
   const sel = document.getElementById('ger-cial-user');
   sel.innerHTML = admins.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
   document.getElementById('ger-cial-pin').value = '';
