@@ -787,6 +787,28 @@
 
     <div class="badge" id="ger-dashboard-nome">—</div>
 
+    <div class="home-sub" style="margin-top:8px; margin-bottom:24px;">O que você deseja fazer?</div>
+    <div class="role-grid">
+      <div class="role-card" onclick="abrirAberturaDesafios()">
+        <span class="icon">🗓️</span>
+        <div class="label">Abertura de Desafios</div>
+      </div>
+      <div class="role-card" onclick="abrirRetroativo()">
+        <span class="icon">📝</span>
+        <div class="label">Lançar Resultados Retroativos</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- TELA: ABERTURA DE DESAFIOS (GV)                                -->
+  <!-- ============================================================= -->
+  <div class="screen" id="screen-gerente-abertura">
+    <div class="top-bar">
+      <div class="brand">Abertura de <span>Desafios</span></div>
+      <button class="back-btn" onclick="irPara('screen-gerente-dashboard')">← Voltar ao menu</button>
+    </div>
+
     <div class="panel">
       <h2>Data de referência dos desafios</h2>
       <div class="hint">Escolha o dia a que esses desafios se referem. Você pode montar os desafios de amanhã com antecedência, por exemplo.</div>
@@ -800,12 +822,6 @@
       <button class="primary-btn" onclick="salvarConfigDoDia()">Salvar desafios do dia</button>
       <div class="error-msg" id="ger-save-status"></div>
     </div>
-
-    <div class="panel">
-      <h2>Lançar resultado de um RN</h2>
-      <div class="hint">Se um RN esqueceu de preencher, ou um valor chegou atrasado, você pode lançar/editar aqui — até 15 dias atrás.</div>
-      <button class="back-btn" style="width:100%;" onclick="abrirRetroativo()">📝 Lançar resultado retroativo</button>
-    </div>
   </div>
 
   <!-- ============================================================= -->
@@ -814,7 +830,7 @@
   <div class="screen" id="screen-gerente-retroativo">
     <div class="top-bar">
       <div class="brand">Lançar <span>Resultado</span></div>
-      <button class="back-btn" onclick="irPara('screen-gerente-dashboard')">← Voltar</button>
+      <button class="back-btn" onclick="irPara('screen-gerente-dashboard')">← Voltar ao menu</button>
     </div>
 
     <div class="panel">
@@ -1668,12 +1684,19 @@ function loginGerente(){
 
   sessaoGerente = { gerenteId: gerente.id, nome: gerente.nome, operacaoId: gerente.operacaoId };
   document.getElementById('ger-dashboard-nome').textContent = gerente.nome;
-  document.getElementById('ger-data-referencia').value = hojeISO();
   document.getElementById('ger-pin').value = '';
 
-  renderizarChecklistCategorias();
-  carregarConfigDoDia();
   irPara('screen-gerente-dashboard');
+}
+
+// Abre a tela de Abertura de Desafios (a partir do menu do GV), carregando
+// a config do dia só nesse momento — não precisa buscar isso logo no login.
+function abrirAberturaDesafios(){
+  if(!sessaoGerente) return;
+  document.getElementById('ger-data-referencia').value = hojeISO();
+  renderizarChecklistCategorias();
+  irPara('screen-gerente-abertura');
+  carregarConfigDoDia();
 }
 
 function logoutGerente(){
