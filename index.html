@@ -1039,7 +1039,7 @@
 
       <div class="panel">
         <h2>PINs dos GVs</h2>
-        <div class="hint">Redefina o PIN de acesso dos GVs. O padrão para todos é <strong>1234</strong>. Use o filtro para localizar rapidamente.</div>
+        <div class="hint">Redefina o PIN de acesso dos GVs. O padrão para todos é <strong>1020</strong>. Use o filtro para localizar rapidamente.</div>
         <div class="adm-filtro"><span class="lupa">🔍</span><input type="text" id="senha-gv-filtro" placeholder="Filtrar por nome, código ou operação..." oninput="renderSenhasGVs()"></div>
         <div class="adm-count" id="senha-gv-count"></div>
         <div class="adm-list" id="senha-gv-lista"></div>
@@ -1125,8 +1125,8 @@ const CATEGORIAS_INICIAIS = [
 // Estes são os valores iniciais (semente). As senhas ficam editáveis
 // pela aba "Senhas" do Painel Gerencial e são salvas no armazenamento.
 const USUARIOS_GERENCIAIS_INICIAIS = [
-  { id: 'leonardo', nome: 'Leonardo', senha: '1234' },
-  { id: 'rodrigo',  nome: 'Rodrigo',  senha: '1234' }
+  { id: 'leonardo', nome: 'Leonardo', senha: '4050' },
+  { id: 'rodrigo',  nome: 'Rodrigo',  senha: '4050' }
 ];
 
 // URL do Web App do Google Apps Script (backend conectado ao Google Sheets)
@@ -1149,16 +1149,16 @@ const BASE_INICIAL = {
     { id: "op4", nome: "Virginia Norte Pioneiro", codigo: "4", gerenteComercialId: "gc1" }
   ],
   gvs: [
-    { id: "gvop1_1", nome: "GV - ANDERSON", codigo: "1", operacaoId: "op1", pin: "1234" },
-    { id: "gvop1_2", nome: "GV - RONALDO", codigo: "2", operacaoId: "op1", pin: "1234" },
-    { id: "gvop1_3", nome: "GV - REGINALDO", codigo: "3", operacaoId: "op1", pin: "1234" },
-    { id: "gvop1_4", nome: "GV - FERNANDO", codigo: "4", operacaoId: "op1", pin: "1234" },
-    { id: "gvop2_1", nome: "GV - DANILO", codigo: "1", operacaoId: "op2", pin: "1234" },
-    { id: "gvop2_2", nome: "GV - CLEVERSON", codigo: "2", operacaoId: "op2", pin: "1234" },
-    { id: "gvop3_1", nome: "GV - PRISCILA", codigo: "1", operacaoId: "op3", pin: "1234" },
-    { id: "gvop3_2", nome: "GV - ALEXANDRE", codigo: "2", operacaoId: "op3", pin: "1234" },
-    { id: "gvop3_3", nome: "GV - MAURO", codigo: "3", operacaoId: "op3", pin: "1234" },
-    { id: "gvop4_1", nome: "GV - LUIZ", codigo: "1", operacaoId: "op4", pin: "1234" }
+    { id: "gvop1_1", nome: "GV - ANDERSON", codigo: "1", operacaoId: "op1", pin: "1020" },
+    { id: "gvop1_2", nome: "GV - RONALDO", codigo: "2", operacaoId: "op1", pin: "1020" },
+    { id: "gvop1_3", nome: "GV - REGINALDO", codigo: "3", operacaoId: "op1", pin: "1020" },
+    { id: "gvop1_4", nome: "GV - FERNANDO", codigo: "4", operacaoId: "op1", pin: "1020" },
+    { id: "gvop2_1", nome: "GV - DANILO", codigo: "1", operacaoId: "op2", pin: "1020" },
+    { id: "gvop2_2", nome: "GV - CLEVERSON", codigo: "2", operacaoId: "op2", pin: "1020" },
+    { id: "gvop3_1", nome: "GV - PRISCILA", codigo: "1", operacaoId: "op3", pin: "1020" },
+    { id: "gvop3_2", nome: "GV - ALEXANDRE", codigo: "2", operacaoId: "op3", pin: "1020" },
+    { id: "gvop3_3", nome: "GV - MAURO", codigo: "3", operacaoId: "op3", pin: "1020" },
+    { id: "gvop4_1", nome: "GV - LUIZ", codigo: "1", operacaoId: "op4", pin: "1020" }
   ],
   rns: [
     { id: "rn_1_101", nome: "", codigo: "101", gvId: "gvop1_1", chave: "1_101" },
@@ -1298,7 +1298,7 @@ const NIVEIS = {
     campos: [
       { key: 'nome', label: 'Nome do GV', obrigatorio: true },
       { key: 'codigo', label: 'Código (opcional)', obrigatorio: false },
-      { key: 'pin', label: 'PIN de acesso (opcional, padrão 1234)', obrigatorio: false }
+      { key: 'pin', label: 'PIN de acesso (opcional, padrão 1020)', obrigatorio: false }
     ],
     pai: { nivel: 'operacao', campo: 'operacaoId', label: 'Operação' }
   },
@@ -1677,7 +1677,7 @@ function loginGerente(){
     erroEl.textContent = 'Selecione um GV válido.';
     return;
   }
-  if(pin !== (gerente.pin || '1234')){
+  if(pin !== (gerente.pin || '1020')){
     erroEl.textContent = 'PIN incorreto.';
     return;
   }
@@ -2581,8 +2581,8 @@ function renderSenhasGVs(){
 
   listaEl.innerHTML = filtrados.map(gv => {
     const op = organizacao.operacoes.find(o => o.id === gv.operacaoId);
-    const pin = gv.pin || '1234';
-    const ehPadrao = pin === '1234';
+    const pin = gv.pin || '1020';
+    const ehPadrao = pin === '1020';
     return `
       <div class="adm-row">
         <div class="info">
@@ -2664,11 +2664,11 @@ async function salvarTrocaPinGV(){
 async function resetarPinGV(id){
   const gv = organizacao.gvs.find(g => g.id === id);
   if(!gv) return;
-  if(!confirm(`Resetar o PIN de ${gv.nome} para o padrão 1234?`)) return;
-  gv.pin = '1234';
+  if(!confirm(`Resetar o PIN de ${gv.nome} para o padrão 1020?`)) return;
+  gv.pin = '1020';
   await salvarOrganizacaoNoBackend(organizacao);
   renderSenhasGVs();
-  mostrarToast('PIN resetado para 1234.');
+  mostrarToast('PIN resetado para 1020.');
 }
 
 /* ---------------- Renderização genérica de lista + formulário ---------------- */
@@ -2791,7 +2791,7 @@ async function cadastrarItemNivel(nivel){
   aplicarChaveRN(nivel, valores);
 
   valores.id = gerarId(nivel);
-  if(nivel === 'gv' && !valores.pin) valores.pin = '1234';
+  if(nivel === 'gv' && !valores.pin) valores.pin = '1020';
   obterArray(nivel).push(valores);
 
   await salvarOrganizacaoNoBackend(organizacao);
@@ -3010,7 +3010,7 @@ async function importarLinhasParaOrganizacao(linhas){
     if(gvCodigo || gvNome){
       gv = acharGV(gvCodigo, op.id, gvNome);
       if(!gv){
-        gv = { id: gerarId('gv'), nome: gvNome || `GV ${gvCodigo}`, codigo: gvCodigo, operacaoId: op.id, pin: '1234' };
+        gv = { id: gerarId('gv'), nome: gvNome || `GV ${gvCodigo}`, codigo: gvCodigo, operacaoId: op.id, pin: '1020' };
         organizacao.gvs.push(gv);
       }else{
         if(gvNome) gv.nome = gvNome;
