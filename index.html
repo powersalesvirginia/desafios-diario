@@ -1033,7 +1033,7 @@ const USUARIOS_GERENCIAIS_INICIAIS = [
 ];
 
 // URL do Web App do Google Apps Script (backend conectado ao Google Sheets)
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyDHFSXr1OGj-COPp2B9mzNtKzCVHhkkQACInGz8_z3BP8R8qwuxX2zqL5jBac1Tq6/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx35k9HKEVscuWQA2yQBJ-NKP4zSnmfPEZuvYB670DFCEefLFK5-gMM_T57dzKNBx0Z/exec';
 
 /* =====================================================================
    BASE INICIAL DA EQUIPE COMERCIAL (pré-carregada)
@@ -1233,94 +1233,148 @@ function nomeExibicaoRN(rn){
   return rn.codigo ? `RN ${rn.codigo}` : 'RN sem nome';
 }
 
-/* ---------------- Persistência da organização ----------------
-   Fonte de verdade atual: a base fica salva no navegador
-   (localStorage). Na primeira vez que o site abre, ela é semeada
-   com a BASE_INICIAL extraída da planilha. As edições feitas pela
-   tela Gerencial atualizam essa base local.
-
-   Observação: por enquanto a base é por navegador. A sincronização
-   entre dispositivos via Google Sheets fica para uma próxima etapa,
-   quando o backend estiver 100%.
+/* ---------------- Persistência — Google Sheets como fonte de verdade ----------------
+   Estratégia:
+   1. Ao abrir, carrega instantaneamente o que estiver salvo neste navegador
+      (cache local), pra tela nunca ficar vazia esperando rede.
+   2. Em seguida, tenta buscar tudo do Google Sheets (sincronizarComBackend).
+      Se conseguir, o Sheets passa a valer e o cache local é atualizado.
+   3. Se essa primeira busca vier vazia (Sheets ainda sem nada) e já existir
+      dado salvo neste navegador, faz a migração automática: envia o que
+      está aqui para o Sheets, uma única vez.
+   4. Se o Sheets não responder (sem internet, erro etc.), o app continua
+      funcionando com o cache local e avisa que está offline.
 ------------------------------------------------------------------ */
-
-const CHAVE_ORGANIZACAO = 'organizacao_cadastro_v3';
 
 function clonar(obj){
   return JSON.parse(JSON.stringify(obj));
 }
 
-function carregarOrganizacao(){
-  const bruto = localStorage.getItem(CHAVE_ORGANIZACAO);
-  if(bruto){
-    try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed abaixo */ }
-  }
-  const semente = clonar(BASE_INICIAL);
-  localStorage.setItem(CHAVE_ORGANIZACAO, JSON.stringify(semente));
-  return semente;
+async function apiGet(query){
+  const resp = await fetch(`${APPS_SCRIPT_URL}?${query}`);
+  if(!resp.ok) throw new Error('Falha na requisição (' + resp.status + ')');
+  return resp.json();
 }
 
-function salvarOrganizacaoNoBackend(org){
+async function apiPost(corpo){
+  const resp = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, // evita pre-flight de CORS
+    body: JSON.stringify(corpo)
+  });
+  if(!resp.ok) throw new Error('Falha na requisição (' + resp.status + ')');
+  return resp.json();
+}
+
+const CHAVE_ORGANIZACAO = 'organizacao_cache_v4';
+const CHAVE_CATEGORIAS = 'categorias_cache_v2';
+const CHAVE_ADMINS = 'admins_cache_v2';
+
+function carregarOrganizacaoLocal(){
+  const bruto = localStorage.getItem(CHAVE_ORGANIZACAO);
+  if(bruto){ try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed */ } }
+  return clonar(BASE_INICIAL);
+}
+function carregarCategoriasLocal(){
+  const bruto = localStorage.getItem(CHAVE_CATEGORIAS);
+  if(bruto){ try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed */ } }
+  return clonar(CATEGORIAS_INICIAIS);
+}
+function carregarAdminsLocal(){
+  const bruto = localStorage.getItem(CHAVE_ADMINS);
+  if(bruto){ try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed */ } }
+  return clonar(USUARIOS_GERENCIAIS_INICIAIS);
+}
+
+// Estado em memória (síncrono, pronto assim que a página carrega).
+let organizacao = carregarOrganizacaoLocal();
+let categorias = carregarCategoriasLocal();
+let admins = carregarAdminsLocal();
+function categoriasAtivas(){ return categorias.filter(c => c.ativa); }
+
+let backendOk = false; // vira true assim que uma sincronização der certo
+
+// Busca tudo do Sheets. Se vier vazio e houver dado local, migra (sobe) uma vez.
+async function sincronizarComBackend(silencioso){
+  try{
+    const dados = await apiGet('tipo=tudo');
+    backendOk = true;
+
+    const orgVazia = !dados.organizacao ||
+      (dados.organizacao.gerentesComerciais.length === 0 &&
+       dados.organizacao.operacoes.length === 0 &&
+       dados.organizacao.gvs.length === 0);
+
+    if(orgVazia && (organizacao.gvs.length > 0 || organizacao.operacoes.length > 0)){
+      // Sheets ainda vazio, mas já temos dados neste navegador: migra pra lá.
+      await migrarDadosLocaisParaBackend();
+    }else{
+      if(dados.organizacao) organizacao = dados.organizacao;
+      if(dados.categorias && dados.categorias.length) categorias = dados.categorias;
+      if(dados.admins && dados.admins.length) admins = dados.admins;
+      localStorage.setItem(CHAVE_ORGANIZACAO, JSON.stringify(organizacao));
+      localStorage.setItem(CHAVE_CATEGORIAS, JSON.stringify(categorias));
+      localStorage.setItem(CHAVE_ADMINS, JSON.stringify(admins));
+    }
+    return true;
+  }catch(err){
+    backendOk = false;
+    if(!silencioso) mostrarToast('Sem conexão com o servidor — usando dados salvos neste navegador.');
+    return false;
+  }
+}
+
+async function migrarDadosLocaisParaBackend(){
+  try{
+    await apiPost({ tipo: 'organizacao', dados: organizacao });
+    await apiPost({ tipo: 'categorias', dados: categorias });
+    await apiPost({ tipo: 'admins', dados: admins });
+    mostrarToast('Dados migrados para o Google Sheets com sucesso.');
+  }catch(e){
+    mostrarToast('Não consegui migrar os dados para o Sheets agora. Tentando de novo mais tarde.');
+  }
+}
+
+// Chamado uma vez ao carregar a página.
+sincronizarComBackend(true);
+
+async function salvarOrganizacaoNoBackend(org){
   localStorage.setItem(CHAVE_ORGANIZACAO, JSON.stringify(org));
-  return Promise.resolve({ ok: true });
+  try{
+    await apiPost({ tipo: 'organizacao', dados: org });
+  }catch(e){
+    mostrarToast('Salvo neste navegador, mas não consegui sincronizar com o Sheets agora.');
+  }
 }
 
 // Permite recarregar a base original da planilha, descartando edições locais.
-function restaurarBaseInicial(){
+async function restaurarBaseInicial(){
   if(!confirm('Isso vai descartar todas as edições feitas e restaurar a base original da planilha. Continuar?')) return;
   organizacao = clonar(BASE_INICIAL);
-  localStorage.setItem(CHAVE_ORGANIZACAO, JSON.stringify(organizacao));
+  await salvarOrganizacaoNoBackend(organizacao);
   const nivelAtivo = Object.keys(NIVEIS).find(k => document.getElementById(`adm-tab-${k}`).classList.contains('active')) || 'gc';
   renderNivel(nivelAtivo);
   atualizarSelectsDeLogin();
   mostrarToast('Base original restaurada.');
 }
 
-let organizacao = carregarOrganizacao();
-
-/* ---------------- Persistência das categorias de desafios ---------------- */
-
-const CHAVE_CATEGORIAS = 'categorias_desafios_v1';
-
-function carregarCategorias(){
-  const bruto = localStorage.getItem(CHAVE_CATEGORIAS);
-  if(bruto){
-    try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed abaixo */ }
-  }
-  const semente = clonar(CATEGORIAS_INICIAIS);
-  localStorage.setItem(CHAVE_CATEGORIAS, JSON.stringify(semente));
-  return semente;
-}
-
-function salvarCategorias(){
+async function salvarCategorias(){
   localStorage.setItem(CHAVE_CATEGORIAS, JSON.stringify(categorias));
-  return Promise.resolve({ ok: true });
-}
-
-// Lista completa (para o painel gerencial) e só as ativas (para os GVs).
-let categorias = carregarCategorias();
-function categoriasAtivas(){ return categorias.filter(c => c.ativa); }
-
-/* ---------------- Persistência dos administradores ---------------- */
-
-const CHAVE_ADMINS = 'admins_gerenciais_v1';
-
-function carregarAdmins(){
-  const bruto = localStorage.getItem(CHAVE_ADMINS);
-  if(bruto){
-    try{ return JSON.parse(bruto); }catch(e){ /* cai pro seed */ }
+  try{
+    await apiPost({ tipo: 'categorias', dados: categorias });
+  }catch(e){
+    mostrarToast('Salvo neste navegador, mas não consegui sincronizar com o Sheets agora.');
   }
-  const semente = clonar(USUARIOS_GERENCIAIS_INICIAIS);
-  localStorage.setItem(CHAVE_ADMINS, JSON.stringify(semente));
-  return semente;
 }
 
-function salvarAdmins(){
+async function salvarAdmins(){
   localStorage.setItem(CHAVE_ADMINS, JSON.stringify(admins));
-  return Promise.resolve({ ok: true });
+  try{
+    await apiPost({ tipo: 'admins', dados: admins });
+  }catch(e){
+    mostrarToast('Salvo neste navegador, mas não consegui sincronizar com o Sheets agora.');
+  }
 }
-
-let admins = carregarAdmins();
 
 
 /* ---------------- Estado em memória da sessão atual ---------------- */
@@ -1348,27 +1402,48 @@ function hojeISO(){
 }
 
 /* =====================================================================
-   PERSISTÊNCIA — Config diária e resultados (localStorage por enquanto).
-   Quando o backend Google Sheets estiver 100%, estas 3 funções voltam
-   a usar fetch(APPS_SCRIPT_URL) como já preparamos antes.
+   PERSISTÊNCIA — Config diária e resultados, via Google Sheets.
+   Mantém também uma cópia no localStorage como cache/fallback: se o
+   envio ao Sheets falhar (sem internet, etc.), nada se perde — fica
+   salvo aqui e o RN/GV recebe um aviso claro do que aconteceu.
 ===================================================================== */
 
-function salvarConfigDoDiaNoBackend(registro){
+async function salvarConfigDoDiaNoBackend(registro){
   const chave = `desafios_config_${registro.gerenteId}_${registro.data}`;
   localStorage.setItem(chave, JSON.stringify(registro));
-  return Promise.resolve({ ok: true });
+  await apiPost({ tipo: 'config', ...registro });
 }
 
-function carregarConfigDoDiaDoBackend(gerenteId, data){
-  const chave = `desafios_config_${gerenteId}_${data}`;
-  const bruto = localStorage.getItem(chave);
-  return Promise.resolve(bruto ? JSON.parse(bruto) : null);
+async function carregarConfigDoDiaDoBackend(gerenteId, data){
+  try{
+    const dados = await apiGet(`tipo=config&gerenteId=${encodeURIComponent(gerenteId)}&data=${encodeURIComponent(data)}`);
+    if(dados && dados.categoriasAbertas){
+      localStorage.setItem(`desafios_config_${gerenteId}_${data}`, JSON.stringify(dados));
+      return dados;
+    }
+    return null;
+  }catch(e){
+    // Sem conexão: usa o que tiver salvo neste navegador, se tiver.
+    const chave = `desafios_config_${gerenteId}_${data}`;
+    const bruto = localStorage.getItem(chave);
+    return bruto ? JSON.parse(bruto) : null;
+  }
 }
 
-function enviarValoresNoBackend(registro){
-  const chave = `desafios_resultado_${registro.vendedorId}_${registro.data}_${Date.now()}`;
+async function enviarValoresNoBackend(registro){
+  const chave = `desafios_resultado_${registro.vendedorId}_${registro.data}`;
   localStorage.setItem(chave, JSON.stringify(registro));
-  return Promise.resolve({ ok: true });
+  await apiPost({ tipo: 'resultado', ...registro });
+}
+
+// Busca no Sheets todos os resultados de uma data (usado na tela de Resultados).
+async function obterResultadosDoDiaBackend(data){
+  try{
+    const lista = await apiGet(`tipo=resultados&data=${encodeURIComponent(data)}`);
+    return Array.isArray(lista) ? lista : [];
+  }catch(e){
+    return null; // sinaliza "sem conexão" pra quem chamou
+  }
 }
 
 
@@ -1398,8 +1473,9 @@ function inicializarTelaLoginGerente(){
   popularGerentesDoLogin();
 }
 
-function abrirLoginGerente(){
+async function abrirLoginGerente(){
   irPara('screen-gerente-login');
+  await sincronizarComBackend(true);
   inicializarTelaLoginGerente();
 }
 
@@ -1514,8 +1590,9 @@ function inicializarTelaLoginVendedor(){
   popularGerentesDoVendedorLogin();
 }
 
-function abrirLoginVendedor(){
+async function abrirLoginVendedor(){
   irPara('screen-vendedor-login');
+  await sincronizarComBackend(true);
   inicializarTelaLoginVendedor();
 }
 
@@ -1699,11 +1776,12 @@ function popupSalvarContinuar(){
    TELA DE RESULTADOS — tabelas agrupadas por GV
 ===================================================================== */
 
-function abrirResultados(){
+async function abrirResultados(){
   document.getElementById('res-data').value = hojeISO();
   document.getElementById('res-tipo').value = 'todos';
   document.getElementById('res-valor-wrap').style.display = 'none';
   irPara('screen-resultados');
+  await sincronizarComBackend(true);
   renderResultados();
 }
 
@@ -1746,29 +1824,7 @@ function gvsDoFiltro(tipo, valorId){
   return organizacao.gvs.slice();
 }
 
-// Busca a config diária (categorias abertas) de um GV numa data.
-function configDoDia(gvId, data){
-  const bruto = localStorage.getItem(`desafios_config_${gvId}_${data}`);
-  if(!bruto) return null;
-  try{ return JSON.parse(bruto); }catch(e){ return null; }
-}
-
-// Busca o último resultado enviado por um RN numa data.
-function ultimoResultadoRN(rnId, data){
-  let melhor = null;
-  for(let i = 0; i < localStorage.length; i++){
-    const chave = localStorage.key(i);
-    if(chave && chave.startsWith(`desafios_resultado_${rnId}_${data}_`)){
-      try{
-        const reg = JSON.parse(localStorage.getItem(chave));
-        if(!melhor || (reg.enviadoEm || '') > (melhor.enviadoEm || '')) melhor = reg;
-      }catch(e){ /* ignora */ }
-    }
-  }
-  return melhor;
-}
-
-function renderResultados(){
+async function renderResultados(){
   const data = document.getElementById('res-data').value || hojeISO();
   const tipo = document.getElementById('res-tipo').value;
   const valorId = document.getElementById('res-valor').value;
@@ -1779,11 +1835,29 @@ function renderResultados(){
     return;
   }
 
+  container.innerHTML = '<div class="panel"><div class="empty-state">Carregando resultados...</div></div>';
+
   const gvs = gvsDoFiltro(tipo, valorId);
 
+  // Busca, em paralelo, a config diária de cada GV candidato + todos os
+  // resultados já enviados nessa data (uma única chamada pro segundo caso).
+  const [configs, resultadosDoDia] = await Promise.all([
+    Promise.all(gvs.map(gv => carregarConfigDoDiaDoBackend(gv.id, data))),
+    obterResultadosDoDiaBackend(data)
+  ]);
+
+  if(resultadosDoDia === null){
+    container.innerHTML = '<div class="panel"><div class="empty-state">Não consegui buscar os resultados agora (sem conexão com o servidor). Tente novamente em instantes.</div></div>';
+    return;
+  }
+
+  // Mapa rápido: vendedorId -> último resultado enviado naquele dia.
+  const mapaResultados = {};
+  resultadosDoDia.forEach(r => { mapaResultados[r.vendedorId] = r; });
+
   const blocos = [];
-  gvs.forEach(gv => {
-    const config = configDoDia(gv.id, data);
+  gvs.forEach((gv, i) => {
+    const config = configs[i];
     if(!config || !config.categoriasAbertas || config.categoriasAbertas.length === 0) return;
 
     const cats = categorias.filter(c => config.categoriasAbertas.includes(c.id));
@@ -1798,7 +1872,7 @@ function renderResultados(){
     const op = organizacao.operacoes.find(o => o.id === gv.operacaoId);
     const gc = op ? organizacao.gerentesComerciais.find(g => g.id === op.gerenteComercialId) : null;
 
-    blocos.push(montarBlocoGV(gv, op, gc, cats, rns, data));
+    blocos.push(montarBlocoGV(gv, op, gc, cats, rns, mapaResultados));
   });
 
   if(blocos.length === 0){
@@ -1821,11 +1895,11 @@ function fmtNum(n){
   return Number.isInteger(n) ? String(n) : Number(n).toFixed(1);
 }
 
-function montarBlocoGV(gv, op, gc, cats, rns, data){
+function montarBlocoGV(gv, op, gc, cats, rns, mapaResultados){
   const subInfo = [op ? op.nome : null, gc ? `GC: ${gc.nome}` : null].filter(Boolean).join(' · ');
 
   const itensRN = rns.map((rn, idx) => {
-    const resultado = ultimoResultadoRN(rn.id, data);
+    const resultado = mapaResultados[rn.id] || null;
     const nome = nomeExibicaoRN(rn);
     const rid = `${gv.id}_${rn.id}`.replace(/[^a-zA-Z0-9_]/g,'');
 
@@ -1911,12 +1985,13 @@ function alternarTodosRN(btn){
    PAINEL GERENCIAL — acesso, abas e navegação
 ===================================================================== */
 
-function abrirGerencial(){
+async function abrirGerencial(){
+  irPara('screen-gerencial-login');
+  await sincronizarComBackend(true);
   const sel = document.getElementById('ger-cial-user');
   sel.innerHTML = admins.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
   document.getElementById('ger-cial-pin').value = '';
   document.getElementById('ger-cial-erro').textContent = '';
-  irPara('screen-gerencial-login');
 }
 
 function loginGerencial(){
