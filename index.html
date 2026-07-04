@@ -508,6 +508,12 @@
     background:rgba(192,72,60,0.12);
     color:var(--danger);
   }
+  .status-tag.editado{
+    background:rgba(184,145,46,0.12);
+    color:var(--amber-deep);
+    font-size:10px;
+    margin-left:6px;
+  }
 
   /* ---------- Modal de edição ---------- */
   .modal-overlay{
@@ -756,6 +762,42 @@
       <div class="cat-toggle-list" id="ger-cat-list"></div>
       <button class="primary-btn" onclick="salvarConfigDoDia()">Salvar desafios do dia</button>
       <div class="error-msg" id="ger-save-status"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Lançar resultado de um RN</h2>
+      <div class="hint">Se um RN esqueceu de preencher, ou um valor chegou atrasado, você pode lançar/editar aqui — até 15 dias atrás.</div>
+      <button class="back-btn" style="width:100%;" onclick="abrirRetroativo()">📝 Lançar resultado retroativo</button>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- TELA: LANÇAMENTO RETROATIVO (GV)                               -->
+  <!-- ============================================================= -->
+  <div class="screen" id="screen-gerente-retroativo">
+    <div class="top-bar">
+      <div class="brand">Lançar <span>Resultado</span></div>
+      <button class="back-btn" onclick="irPara('screen-gerente-dashboard')">← Voltar</button>
+    </div>
+
+    <div class="panel">
+      <h2>Selecionar RN e data</h2>
+      <div class="hint">Você pode lançar ou corrigir resultados de até 15 dias atrás.</div>
+
+      <label for="retro-data">Data</label>
+      <input type="date" id="retro-data">
+
+      <label for="retro-rn">RN</label>
+      <select id="retro-rn"></select>
+
+      <button class="primary-btn" onclick="carregarRetroativo()">Carregar desafios dessa data</button>
+    </div>
+
+    <div class="panel" id="retro-painel-desafios" style="display:none;">
+      <h2 id="retro-titulo">Desafios</h2>
+      <div id="retro-lista-container"></div>
+      <button class="primary-btn" id="retro-salvar-btn" onclick="salvarRetroativo()" style="display:none;">Salvar</button>
+      <div class="error-msg" id="retro-status"></div>
     </div>
   </div>
 
@@ -1597,6 +1639,120 @@ function formatarDataBR(iso){
   return `${d}/${m}/${y}`;
 }
 
+/* ---------------- Lançamento retroativo de resultados (feito pelo GV) ---------------- */
+
+const DIAS_LIMITE_RETROATIVO = 15;
+
+function limiteDataRetroativa(){
+  const hoje = new Date();
+  const off = hoje.getTimezoneOffset();
+  const hojeLocal = new Date(hoje.getTime() - off * 60000);
+  const min = new Date(hojeLocal.getTime() - DIAS_LIMITE_RETROATIVO * 24 * 60 * 60 * 1000);
+  const fmt = d => d.toISOString().slice(0, 10);
+  return { min: fmt(min), max: fmt(hojeLocal) };
+}
+
+function abrirRetroativo(){
+  if(!sessaoGerente) return;
+  const { min, max } = limiteDataRetroativa();
+  const dataEl = document.getElementById('retro-data');
+  dataEl.min = min;
+  dataEl.max = max;
+  dataEl.value = max;
+
+  const rns = organizacao.rns
+    .filter(r => r.gvId === sessaoGerente.gerenteId)
+    .sort((a, b) => {
+      const na = parseInt(a.codigo, 10), nb = parseInt(b.codigo, 10);
+      if(!isNaN(na) && !isNaN(nb)) return na - nb;
+      return String(a.codigo).localeCompare(String(b.codigo));
+    })
+    .map(r => ({ id: r.id, nomeExibicao: nomeExibicaoRN(r) }));
+  preencherSelect(document.getElementById('retro-rn'), rns, 'id', 'nomeExibicao', 'Selecione...');
+
+  document.getElementById('retro-painel-desafios').style.display = 'none';
+  document.getElementById('retro-status').textContent = '';
+  irPara('screen-gerente-retroativo');
+}
+
+async function carregarRetroativo(){
+  if(!sessaoGerente) return;
+  const data = document.getElementById('retro-data').value;
+  const rnId = document.getElementById('retro-rn').value;
+  const statusEl = document.getElementById('retro-status');
+  statusEl.textContent = '';
+
+  if(!data || !rnId){
+    statusEl.textContent = 'Selecione a data e o RN.';
+    return;
+  }
+
+  const { min, max } = limiteDataRetroativa();
+  if(data < min || data > max){
+    statusEl.textContent = `A data precisa estar entre ${formatarDataBR(min)} e ${formatarDataBR(max)}.`;
+    return;
+  }
+
+  const painel = document.getElementById('retro-painel-desafios');
+  const container = document.getElementById('retro-lista-container');
+  const btnSalvar = document.getElementById('retro-salvar-btn');
+  painel.style.display = 'block';
+  container.innerHTML = '<div class="empty-state">Carregando...</div>';
+  btnSalvar.style.display = 'none';
+
+  const [config, resultadoAnterior] = await Promise.all([
+    carregarConfigDoDiaDoBackend(sessaoGerente.gerenteId, data),
+    obterMeuResultadoDoDiaBackend(rnId, data)
+  ]);
+
+  const abertasIds = config ? config.categoriasAbertas : [];
+  const categoriasAbertas = categorias.filter(c => abertasIds.includes(c.id));
+  const rn = organizacao.rns.find(r => r.id === rnId);
+
+  document.getElementById('retro-titulo').textContent = `Desafios de ${formatarDataBR(data)} · ${rn ? nomeExibicaoRN(rn) : ''}`;
+
+  if(categoriasAbertas.length === 0){
+    container.innerHTML = '<div class="empty-state">Nenhum desafio estava aberto para esse GV nessa data.</div>';
+    return;
+  }
+
+  const valoresAnteriores = (resultadoAnterior && resultadoAnterior.valores) ? resultadoAnterior.valores : {};
+  criarCardsDesafio(container, categoriasAbertas, valoresAnteriores);
+  btnSalvar.style.display = 'block';
+}
+
+async function salvarRetroativo(){
+  if(!sessaoGerente) return;
+  const data = document.getElementById('retro-data').value;
+  const rnId = document.getElementById('retro-rn').value;
+  const statusEl = document.getElementById('retro-status');
+  const container = document.getElementById('retro-lista-container');
+
+  const valores = coletarValoresDosCards(container);
+
+  const registro = {
+    vendedorId: rnId,
+    gerenteId: sessaoGerente.gerenteId,
+    operacaoId: sessaoGerente.operacaoId,
+    data: data,
+    valores: valores,
+    enviadoEm: new Date().toISOString(),
+    editadoPor: sessaoGerente.nome // marca que foi o GV quem lançou/editou, não o próprio RN
+  };
+
+  statusEl.style.color = 'var(--chalk-dim)';
+  statusEl.textContent = 'Salvando...';
+
+  try{
+    await enviarValoresNoBackend(registro);
+    statusEl.textContent = '';
+    mostrarToast('Resultado salvo com sucesso.');
+  }catch(e){
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Erro ao salvar. Tente novamente.';
+  }
+}
+
 
 /* =====================================================================
    LOGIN — VENDEDOR
@@ -1690,7 +1846,18 @@ async function carregarDesafiosDoVendedor(){
   }
 
   const valoresAnteriores = (meuResultadoAnterior && meuResultadoAnterior.valores) ? meuResultadoAnterior.valores : {};
+  criarCardsDesafio(container, categoriasAbertas, valoresAnteriores);
+  btnEnviar.style.display = 'block';
 
+  if(meuResultadoAnterior){
+    mostrarToast('Seus valores salvos anteriormente foram carregados.');
+  }
+}
+
+// Cria, dentro de um container, um card por categoria com os campos
+// Desafio/Realizado/Ating. — usado tanto pelo RN quanto pelo lançamento
+// retroativo do GV, pra manter os dois sempre com a mesma cara e lógica.
+function criarCardsDesafio(container, categoriasAbertas, valoresAnteriores){
   container.innerHTML = '';
   categoriasAbertas.forEach(cat => {
     const anterior = valoresAnteriores[cat.id];
@@ -1699,40 +1866,41 @@ async function carregarDesafiosDoVendedor(){
 
     const card = document.createElement('div');
     card.className = 'desafio-card';
+    card.dataset.catId = cat.id;
     card.innerHTML = `
       <div class="cat-nome">${cat.label}</div>
       <div class="desafio-campos">
         <div class="campo">
           <label>Desafio (meta)</label>
           <input type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="${valDesafio}"
-                 data-cat-id="${cat.id}" data-tipo="desafio" oninput="recalcularPct('${cat.id}')">
+                 data-tipo="desafio" oninput="recalcularPct(this)">
         </div>
         <div class="campo">
           <label>Realizado</label>
           <input type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="${valRealizado}"
-                 data-cat-id="${cat.id}" data-tipo="realizado" oninput="recalcularPct('${cat.id}')">
+                 data-tipo="realizado" oninput="recalcularPct(this)">
         </div>
         <div class="pct">
           <div class="pct-label">Ating.</div>
-          <div class="pct-valor" id="pct-${cat.id}">—</div>
+          <div class="pct-valor">—</div>
         </div>
       </div>
     `;
     container.appendChild(card);
-    if(valDesafio !== '' || valRealizado !== '') recalcularPct(cat.id);
+    if(valDesafio !== '' || valRealizado !== ''){
+      recalcularPct(card.querySelector('[data-tipo="desafio"]'));
+    }
   });
-  btnEnviar.style.display = 'block';
-
-  if(meuResultadoAnterior){
-    mostrarToast('Seus valores salvos anteriormente foram carregados.');
-  }
 }
 
-// Calcula o atingimento (Realizado ÷ Desafio × 100) de uma categoria.
-function recalcularPct(catId){
-  const desafioEl = document.querySelector(`input[data-cat-id="${catId}"][data-tipo="desafio"]`);
-  const realizadoEl = document.querySelector(`input[data-cat-id="${catId}"][data-tipo="realizado"]`);
-  const pctEl = document.getElementById(`pct-${catId}`);
+// Calcula o atingimento (Realizado ÷ Desafio × 100) do card que contém o
+// campo alterado. Escopado ao próprio card (não busca no documento inteiro),
+// pra funcionar mesmo com mais de uma tela de desafios presente no DOM.
+function recalcularPct(inputEl){
+  const card = inputEl.closest('.desafio-card');
+  const desafioEl = card.querySelector('[data-tipo="desafio"]');
+  const realizadoEl = card.querySelector('[data-tipo="realizado"]');
+  const pctEl = card.querySelector('.pct-valor');
 
   const meta = parseFloat(desafioEl.value);
   const real = parseFloat(realizadoEl.value);
@@ -1748,22 +1916,29 @@ function recalcularPct(catId){
   }
 }
 
-async function enviarValoresVendedor(){
-  if(!sessaoVendedor) return;
-  const statusEl = document.getElementById('ven-save-status');
-  const data = hojeISO();
-
-  // Coleta, por categoria, o desafio (meta), o realizado e o % de atingimento.
+// Lê os cards de desafio de um container e monta o objeto de valores
+// {catId: {desafio, realizado, atingimento}} — usado no envio do RN e
+// também no lançamento retroativo feito pelo GV.
+function coletarValoresDosCards(container){
   const valores = {};
-  document.querySelectorAll('#ven-lista-container .desafio-card').forEach(card => {
+  container.querySelectorAll('.desafio-card').forEach(card => {
+    const catId = card.dataset.catId;
     const desafioEl = card.querySelector('input[data-tipo="desafio"]');
     const realizadoEl = card.querySelector('input[data-tipo="realizado"]');
-    const catId = desafioEl.dataset.catId;
     const meta = desafioEl.value === '' ? 0 : Number(desafioEl.value);
     const real = realizadoEl.value === '' ? 0 : Number(realizadoEl.value);
     const pct = meta > 0 ? Number(((real / meta) * 100).toFixed(1)) : 0;
     valores[catId] = { desafio: meta, realizado: real, atingimento: pct };
   });
+  return valores;
+}
+
+async function enviarValoresVendedor(){
+  if(!sessaoVendedor) return;
+  const statusEl = document.getElementById('ven-save-status');
+  const data = hojeISO();
+
+  const valores = coletarValoresDosCards(document.getElementById('ven-lista-container'));
 
   const registro = {
     vendedorId: sessaoVendedor.vendedorId,
@@ -1771,7 +1946,8 @@ async function enviarValoresVendedor(){
     operacaoId: sessaoVendedor.operacaoId,
     data: data,
     valores: valores,
-    enviadoEm: new Date().toISOString()
+    enviadoEm: new Date().toISOString(),
+    editadoPor: '' // enviado pelo próprio RN, não por um GV
   };
 
   statusEl.style.color = 'var(--chalk-dim)';
@@ -1972,12 +2148,16 @@ function montarBlocoGV(gv, op, gc, cats, rns, mapaResultados){
       mediaHtml = `<span class="rn-media-val vazio">sem envio</span>`;
     }
 
+    const tagEditado = (resultado && resultado.editadoPor)
+      ? `<span class="status-tag editado" title="Lançado/editado por ${resultado.editadoPor}">✎ Editado por ${resultado.editadoPor}</span>`
+      : '';
+
     return `
       <div class="rn-item" id="rnitem_${rid}">
         <div class="rn-cabecalho" onclick="alternarRN('${rid}')">
           <div class="rn-id">
             <div class="rn-nome">${nome}</div>
-            <div class="rn-cod">Cód. ${rn.codigo || '—'}</div>
+            <div class="rn-cod">Cód. ${rn.codigo || '—'}${tagEditado}</div>
           </div>
           <div class="rn-media">
             ${mediaHtml}
