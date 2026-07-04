@@ -554,51 +554,93 @@
   .resultado-gv-sub{
     font-size:12px;
     color:var(--chalk-dim);
-    margin-bottom:10px;
+    margin-bottom:12px;
   }
-  .tabela-wrap{
-    overflow-x:auto;
+
+  /* Item de RN (expansível) */
+  .rn-item{
     border:1px solid var(--divider);
     border-radius:8px;
-    -webkit-overflow-scrolling:touch;
+    margin-bottom:8px;
+    overflow:hidden;
   }
-  table.resultado{
+  .rn-cabecalho{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:11px 13px;
+    background:var(--board-lighter);
+    cursor:pointer;
+  }
+  .rn-cabecalho .rn-id{ min-width:0; }
+  .rn-cabecalho .rn-nome{ font-size:13.5px; font-weight:600; }
+  .rn-cabecalho .rn-cod{ font-size:11px; color:var(--chalk-dim); margin-top:1px; }
+  .rn-cabecalho .rn-media{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-shrink:0;
+  }
+  .rn-media-val{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:16px;
+  }
+  .rn-media-val.ok{ color:var(--success); }
+  .rn-media-val.baixo{ color:var(--amber); }
+  .rn-media-val.vazio{ color:var(--chalk-dim); opacity:0.6; font-size:13px; }
+  .rn-seta{ font-size:11px; color:var(--chalk-dim); transition:transform .15s; }
+  .rn-item.aberto .rn-seta{ transform:rotate(180deg); }
+
+  /* Corpo: tabela compacta de 4 colunas */
+  .rn-corpo{ display:none; }
+  .rn-item.aberto .rn-corpo{ display:block; }
+  table.res-mini{
     border-collapse:collapse;
     width:100%;
-    font-size:13px;
-    white-space:nowrap;
+    font-size:12.5px;
   }
-  table.resultado th, table.resultado td{
-    padding:9px 11px;
-    text-align:center;
-    border-bottom:1px solid var(--divider);
+  table.res-mini th, table.res-mini td{
+    padding:8px 10px;
+    border-top:1px solid var(--divider);
   }
-  table.resultado thead th{
-    background:var(--board-lighter);
+  table.res-mini thead th{
     font-family:var(--font-display);
     font-weight:600;
-    font-size:11px;
+    font-size:10px;
     text-transform:uppercase;
     letter-spacing:0.3px;
     color:var(--chalk-dim);
-    position:sticky;
-    top:0;
+    text-align:right;
   }
-  table.resultado td.rn-cel, table.resultado th.rn-cel{
+  table.res-mini thead th:first-child{ text-align:left; }
+  table.res-mini td{ text-align:right; }
+  table.res-mini td.cat-nome{
     text-align:left;
-    position:sticky;
-    left:0;
-    background:var(--board-light);
-    z-index:1;
-    min-width:150px;
+    color:var(--chalk);
+    font-weight:500;
   }
-  table.resultado thead th.rn-cel{ background:var(--board-lighter); z-index:2; }
-  table.resultado .rn-cod{ color:var(--chalk-dim); font-size:11px; }
-  table.resultado tbody tr:last-child td{ border-bottom:none; }
-  .cel-pct{ font-weight:600; }
-  .cel-pct.ok{ color:var(--success); }
-  .cel-pct.baixo{ color:var(--amber); }
-  .cel-vazio{ color:var(--chalk-dim); opacity:0.5; }
+  table.res-mini td.pct{ font-weight:700; }
+  table.res-mini td.pct.ok{ color:var(--success); }
+  table.res-mini td.pct.baixo{ color:var(--amber); }
+  table.res-mini td.vazio{ color:var(--chalk-dim); opacity:0.5; }
+
+  .res-toolbar{
+    display:flex;
+    justify-content:flex-end;
+    margin-bottom:12px;
+  }
+  .res-toggle-todos{
+    background:none;
+    border:1px solid var(--divider);
+    color:var(--chalk-dim);
+    border-radius:8px;
+    padding:7px 12px;
+    font-size:12px;
+    cursor:pointer;
+  }
+  .res-toggle-todos:hover{ border-color:var(--amber); color:var(--amber); }
 </style>
 </head>
 <body>
@@ -1723,7 +1765,6 @@ function renderResultados(){
   const valorId = document.getElementById('res-valor').value;
   const container = document.getElementById('res-conteudo');
 
-  // Se o tipo exige seleção e nada foi escolhido, orienta o usuário.
   if(tipo !== 'todos' && !valorId){
     container.innerHTML = '<div class="panel"><div class="empty-state">Selecione uma opção acima para ver os resultados.</div></div>';
     return;
@@ -1731,16 +1772,12 @@ function renderResultados(){
 
   const gvs = gvsDoFiltro(tipo, valorId);
 
-  // Monta um bloco por GV que tenha desafios cadastrados nessa data.
   const blocos = [];
   gvs.forEach(gv => {
     const config = configDoDia(gv.id, data);
     if(!config || !config.categoriasAbertas || config.categoriasAbertas.length === 0) return;
 
-    // Categorias abertas (na ordem da lista de categorias).
     const cats = categorias.filter(c => config.categoriasAbertas.includes(c.id));
-
-    // RNs desse GV, ordenados pelo código (numérico quando possível).
     const rns = organizacao.rns
       .filter(r => r.gvId === gv.id)
       .sort((a, b) => {
@@ -1752,7 +1789,7 @@ function renderResultados(){
     const op = organizacao.operacoes.find(o => o.id === gv.operacaoId);
     const gc = op ? organizacao.gerentesComerciais.find(g => g.id === op.gerenteComercialId) : null;
 
-    blocos.push(montarTabelaGV(gv, op, gc, cats, rns, data));
+    blocos.push(montarBlocoGV(gv, op, gc, cats, rns, data));
   });
 
   if(blocos.length === 0){
@@ -1760,47 +1797,102 @@ function renderResultados(){
     return;
   }
 
-  container.innerHTML = `<div class="panel">${blocos.join('')}</div>`;
+  container.innerHTML = `
+    <div class="panel">
+      <div class="res-toolbar">
+        <button class="res-toggle-todos" onclick="alternarTodosRN(this)">Expandir todos</button>
+      </div>
+      ${blocos.join('')}
+    </div>`;
 }
 
-function montarTabelaGV(gv, op, gc, cats, rns, data){
+// Formata número de forma enxuta (sem casas decimais desnecessárias).
+function fmtNum(n){
+  if(n == null || isNaN(n)) return '—';
+  return Number.isInteger(n) ? String(n) : Number(n).toFixed(1);
+}
+
+function montarBlocoGV(gv, op, gc, cats, rns, data){
   const subInfo = [op ? op.nome : null, gc ? `GC: ${gc.nome}` : null].filter(Boolean).join(' · ');
 
-  // Cabeçalho: RN + uma coluna por categoria (mostra o % de atingimento).
-  const thCats = cats.map(c => `<th>${c.label}</th>`).join('');
-
-  const linhas = rns.map(rn => {
+  const itensRN = rns.map((rn, idx) => {
     const resultado = ultimoResultadoRN(rn.id, data);
     const nome = nomeExibicaoRN(rn);
-    const tds = cats.map(c => {
+    const rid = `${gv.id}_${rn.id}`.replace(/[^a-zA-Z0-9_]/g,'');
+
+    // Média de atingimento das categorias preenchidas.
+    let somaPct = 0, qtdPreenchidas = 0;
+    const linhas = cats.map(c => {
       const v = resultado && resultado.valores ? resultado.valores[c.id] : null;
-      if(!v || (v.desafio === 0 && v.realizado === 0)){
-        return '<td class="cel-vazio">—</td>';
+      const preenchida = v && !(v.desafio === 0 && v.realizado === 0);
+      if(preenchida){
+        const pct = v.atingimento != null ? v.atingimento : 0;
+        somaPct += pct; qtdPreenchidas++;
+        const classe = pct >= 100 ? 'ok' : 'baixo';
+        return `<tr>
+          <td class="cat-nome">${c.label}</td>
+          <td>${fmtNum(v.desafio)}</td>
+          <td>${fmtNum(v.realizado)}</td>
+          <td class="pct ${classe}">${pct.toFixed(0)}%</td>
+        </tr>`;
       }
-      const pct = v.atingimento != null ? v.atingimento : 0;
-      const classe = pct >= 100 ? 'ok' : 'baixo';
-      return `<td><span class="cel-pct ${classe}">${pct.toFixed(0)}%</span></td>`;
-    }).join('');
-    return `
-      <tr>
-        <td class="rn-cel"><div>${nome}</div><div class="rn-cod">Cód. ${rn.codigo || '—'}</div></td>
-        ${tds}
+      return `<tr>
+        <td class="cat-nome">${c.label}</td>
+        <td class="vazio">—</td>
+        <td class="vazio">—</td>
+        <td class="vazio">—</td>
       </tr>`;
+    }).join('');
+
+    let mediaHtml;
+    if(qtdPreenchidas > 0){
+      const media = somaPct / qtdPreenchidas;
+      mediaHtml = `<span class="rn-media-val ${media >= 100 ? 'ok' : 'baixo'}">${media.toFixed(0)}%</span>`;
+    }else{
+      mediaHtml = `<span class="rn-media-val vazio">sem envio</span>`;
+    }
+
+    return `
+      <div class="rn-item" id="rnitem_${rid}">
+        <div class="rn-cabecalho" onclick="alternarRN('${rid}')">
+          <div class="rn-id">
+            <div class="rn-nome">${nome}</div>
+            <div class="rn-cod">Cód. ${rn.codigo || '—'}</div>
+          </div>
+          <div class="rn-media">
+            ${mediaHtml}
+            <span class="rn-seta">▼</span>
+          </div>
+        </div>
+        <div class="rn-corpo">
+          <table class="res-mini">
+            <thead>
+              <tr><th>Categoria</th><th>Desafio</th><th>Realiz.</th><th>Ating.</th></tr>
+            </thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </div>
+      </div>`;
   }).join('');
 
   return `
     <div class="resultado-gv-bloco">
       <div class="resultado-gv-titulo">${gv.nome}</div>
       ${subInfo ? `<div class="resultado-gv-sub">${subInfo}</div>` : ''}
-      <div class="tabela-wrap">
-        <table class="resultado">
-          <thead>
-            <tr><th class="rn-cel">RN</th>${thCats}</tr>
-          </thead>
-          <tbody>${linhas || `<tr><td class="rn-cel">—</td>${cats.map(()=>'<td class="cel-vazio">—</td>').join('')}</tr>`}</tbody>
-        </table>
-      </div>
+      ${itensRN || '<div class="empty-state">Sem RNs neste GV.</div>'}
     </div>`;
+}
+
+function alternarRN(rid){
+  const el = document.getElementById(`rnitem_${rid}`);
+  if(el) el.classList.toggle('aberto');
+}
+
+function alternarTodosRN(btn){
+  const itens = document.querySelectorAll('#res-conteudo .rn-item');
+  const algumFechado = Array.from(itens).some(i => !i.classList.contains('aberto'));
+  itens.forEach(i => i.classList.toggle('aberto', algumFechado));
+  btn.textContent = algumFechado ? 'Recolher todos' : 'Expandir todos';
 }
 
 
