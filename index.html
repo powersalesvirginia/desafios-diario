@@ -1690,6 +1690,85 @@ async function carregarContextoDesafioBackend(gerenteId, vendedorId, data){
   }
 }
 
+/* =====================================================================
+   CAMADA DE SEGURANÇA DO SITE: envia e CONFIRMA de verdade.
+
+   Como o Apps Script/Sheets mostrou que, sob muita escrita simultânea,
+   uma gravação pode "responder sucesso" mas depois não estar realmente
+   lá (colisão do lado do Google), o site agora relê o que foi salvo
+   logo depois de enviar, e só considera concluído se bater com o que
+   foi mandado. Se não bater, tenta de novo sozinho, sem o usuário
+   precisar perceber ou refazer nada manualmente.
+===================================================================== */
+
+function esperar(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+// Compara dois objetos de valores {catId: {desafio, realizado}} ignorando
+// ordem de chaves (o que importa é o conteúdo, não a ordem).
+function valoresIguais(a, b){
+  const chavesA = Object.keys(a || {}).sort();
+  const chavesB = Object.keys(b || {}).sort();
+  if(chavesA.length !== chavesB.length) return false;
+  for(const k of chavesA){
+    if(!b[k]) return false;
+    if(Number(a[k].desafio) !== Number(b[k].desafio)) return false;
+    if(Number(a[k].realizado) !== Number(b[k].realizado)) return false;
+  }
+  return true;
+}
+
+// Compara duas listas de categorias abertas, ignorando ordem.
+function categoriasIguais(a, b){
+  const sa = [...(a || [])].sort().join(',');
+  const sb = [...(b || [])].sort().join(',');
+  return sa === sb;
+}
+
+// Envia um resultado (RN ou lançamento retroativo do GV) e RELÊ pra
+// confirmar. Tenta de novo automaticamente se a conferência falhar.
+async function enviarResultadoComConfirmacao(registro, elementoStatusId){
+  const statusEl = elementoStatusId ? document.getElementById(elementoStatusId) : null;
+  const maxTentativas = 4;
+
+  for(let tentativa = 1; tentativa <= maxTentativas; tentativa++){
+    try{
+      await enviarValoresNoBackend(registro);
+      const contexto = await carregarContextoDesafioBackend(registro.gerenteId, registro.vendedorId, registro.data);
+      if(contexto.resultado && valoresIguais(contexto.resultado.valores, registro.valores)){
+        return true; // confirmado de verdade: leu de volta e bateu
+      }
+    }catch(e){ /* tenta de novo */ }
+
+    if(tentativa < maxTentativas){
+      if(statusEl) statusEl.innerHTML = htmlCarregandoInline(`Confirmando salvamento (tentativa ${tentativa + 1} de ${maxTentativas})`);
+      await esperar(500 + tentativa * 400);
+    }
+  }
+  return false;
+}
+
+// Mesma ideia, mas pra config diária do GV (categorias abertas).
+async function salvarConfigComConfirmacao(registro, elementoStatusId){
+  const statusEl = elementoStatusId ? document.getElementById(elementoStatusId) : null;
+  const maxTentativas = 4;
+
+  for(let tentativa = 1; tentativa <= maxTentativas; tentativa++){
+    try{
+      await salvarConfigDoDiaNoBackend(registro);
+      const confirmado = await carregarConfigDoDiaDoBackend(registro.gerenteId, registro.data);
+      if(confirmado && categoriasIguais(confirmado.categoriasAbertas, registro.categoriasAbertas)){
+        return true;
+      }
+    }catch(e){ /* tenta de novo */ }
+
+    if(tentativa < maxTentativas){
+      if(statusEl) statusEl.innerHTML = htmlCarregandoInline(`Confirmando salvamento (tentativa ${tentativa + 1} de ${maxTentativas})`);
+      await esperar(500 + tentativa * 400);
+    }
+  }
+  return false;
+}
+
 
 /* =====================================================================
    LOGIN — GERENTE
@@ -1823,12 +1902,17 @@ async function salvarConfigDoDia(){
   };
 
   statusEl.style.color = 'var(--chalk-dim)';
-  statusEl.textContent = 'Salvando...';
+  statusEl.innerHTML = htmlCarregandoInline('Salvando');
 
-  await salvarConfigDoDiaNoBackend(registro);
+  const confirmado = await salvarConfigComConfirmacao(registro, 'ger-save-status');
 
-  statusEl.textContent = '';
-  mostrarToast(`Desafios de ${formatarDataBR(data)} salvos (${abertas.length} categoria(s)).`);
+  if(confirmado){
+    statusEl.textContent = '';
+    mostrarToast(`Desafios de ${formatarDataBR(data)} salvos (${abertas.length} categoria(s)).`);
+  }else{
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Não conseguimos confirmar que salvou. Tente novamente.';
+  }
 }
 
 function formatarDataBR(iso){
@@ -1937,15 +2021,16 @@ async function salvarRetroativo(){
   };
 
   statusEl.style.color = 'var(--chalk-dim)';
-  statusEl.textContent = 'Salvando...';
+  statusEl.innerHTML = htmlCarregandoInline('Salvando');
 
-  try{
-    await enviarValoresNoBackend(registro);
+  const confirmado = await enviarResultadoComConfirmacao(registro, 'retro-status');
+
+  if(confirmado){
     statusEl.textContent = '';
     mostrarToast('Resultado salvo com sucesso.');
-  }catch(e){
+  }else{
     statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = 'Erro ao salvar. Tente novamente.';
+    statusEl.textContent = 'Não conseguimos confirmar que salvou. Tente novamente.';
   }
 }
 
@@ -2150,15 +2235,16 @@ async function enviarValoresVendedor(){
   };
 
   statusEl.style.color = 'var(--chalk-dim)';
-  statusEl.textContent = 'Salvando...';
+  statusEl.innerHTML = htmlCarregandoInline('Salvando');
 
-  try{
-    await enviarValoresNoBackend(registro);
+  const confirmado = await enviarResultadoComConfirmacao(registro, 'ven-save-status');
+
+  if(confirmado){
     statusEl.textContent = '';
     abrirPopupPosSalvar();
-  }catch(e){
+  }else{
     statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = 'Erro ao salvar. Tente novamente.';
+    statusEl.textContent = 'Não conseguimos confirmar que salvou. Tente novamente.';
   }
 }
 
